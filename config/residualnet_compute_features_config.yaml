@@ -1,0 +1,11 @@
+output_folder : 'data/features'
+df_train_path: 'data/df_train.csv'
+df_dev_path: 'data/df_dev.csv'
+df_eval_path: 'data/df_eval.csv'
+
+df_aug_path: 'data/df_aug.csv'
+
+win_len: 1
+hop_size: 1
+fsamp: 16000
+cache_dir: './data/features/'
