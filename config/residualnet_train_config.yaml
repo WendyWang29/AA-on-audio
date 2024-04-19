@@ -27,6 +27,6 @@ fsamp: 16000
 win_len: 3
 hop_size: 3
 
-eval_batch_size: 128
+eval_batch_size: 64 #128
 model_path_spec: './checkpoints/residualnet_model/model_spec_100_64_1e-05/best_model_ASVSpoof2019.pth'
 #'./checkpoints/residualnet_model/model_spec_100_64_1e-05/best_model_ASV_LIBRI.pth'
