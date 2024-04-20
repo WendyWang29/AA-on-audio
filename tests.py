@@ -35,8 +35,9 @@ def eval_one_file_spec(index, config):
     df_eval = pd.read_csv(config['df_eval_path'])
     file_eval = list(df_eval['path'])
 
-    # get the single wav path
+    # get the single file path
     file = file_eval[index]
+    print(f'Evaluating file {file}')
 
     # get the feature (the cached spec is a ndarray: (1025,41) )
     X = get_features(wav_path=file,
