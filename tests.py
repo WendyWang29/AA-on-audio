@@ -27,6 +27,7 @@ def plot_spec(spec, file):
 
     # compute time value for each frame
     frame_times = np.linspace(0,spec.shape[1]-1, 5) * frame_duration
+    frame_times = [f'{value:.3f}' for value in frame_times]
 
     # compute frequency values for each freq bin
     freqs = librosa.fft_frequencies(sr=sr, n_fft=n_fft) #1025 values
@@ -45,7 +46,7 @@ def plot_spec(spec, file):
     plt.colorbar(label='Intensity (dB)')
     file_name_for_title = file.split('/')[-3:]
     file_name_for_title = '/'.join(file_name_for_title)
-    plt.title(f'Magnitude spectrogram for file\n {file_name_for_title} ')
+    plt.title(f'Power spectrogram for file\n {file_name_for_title} ')
     plt.show()
 
 def eval_one_file_spec(index, config):
@@ -96,7 +97,6 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     ##################################
 
-
     # get the config settings
     config_path = 'config/residualnet_train_config.yaml'
     config_res = read_yaml(config_path)
@@ -106,5 +106,5 @@ if __name__ == '__main__':
     model.eval()
 
     # evaluate one single file and show the spectrogram
-    pred = eval_one_file_spec(index=0, config=config_res)
+    pred = eval_one_file_spec(index=1, config=config_res)
     print(f'\n The predictions for the file are {pred} \n the score is {pred[0][0]-pred[0][1]}')
