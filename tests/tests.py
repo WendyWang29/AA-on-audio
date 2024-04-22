@@ -1,3 +1,12 @@
+"""
+Various tests to study
+* how the training and the evaluation work
+* evaluate one single .flac file from the evaluation list
+* plot the spectrogram of one single .flac file from the evaluation list
+
+author: wwang
+"""
+
 import librosa
 
 from src.resnet_model import SpectrogramModel
@@ -98,7 +107,7 @@ if __name__ == '__main__':
     ##################################
 
     # get the config settings
-    config_path = 'config/residualnet_train_config.yaml'
+    config_path = '../config/residualnet_train_config.yaml'
     config_res = read_yaml(config_path)
 
     # load the spectrogram model
@@ -106,5 +115,5 @@ if __name__ == '__main__':
     model.eval()
 
     # evaluate one single file and show the spectrogram
-    pred = eval_one_file_spec(index=1, config=config_res)
+    pred = eval_one_file_spec(index=2, config=config_res)
     print(f'\n The predictions for the file are {pred} \n the score is {pred[0][0]-pred[0][1]}')
