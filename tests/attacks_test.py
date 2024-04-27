@@ -9,7 +9,7 @@ Attacks implemented:
 author: wwang
 '''
 
-class untargeted_FGSM_single_file(object):
+class attack_single_file(object):
     def __init__(self, model, epsilon, data, label, device):
         self.model = model
         self.epsilon = epsilon

@@ -1,14 +1,19 @@
 """
+ATTACK SCRIPTS
 
+class attack_single_file
++ all of its methods
 """
 import torch
 import os
 import pandas as pd
 import numpy as np
 import torch
+import soundfile as sf
 import torch.nn as nn
 from src.resnet_model import SpectrogramModel
 from src.resnet_utils import get_features
+from sp_utils import spectrogram_inversion
 
 
 def load_spec_model(device, config):
@@ -91,6 +96,23 @@ def FGSM_perturb(spec, model, epsilon, GT, device):
     return p_spec
 
 
+def save_perturbed_audio(file, folder, audio, sr, epsilon, attack):
+    # ensure folder path exists
+    os.makedirs(folder, exist_ok=True)
+
+    # create the file path
+    file_name = os.path.splitext(os.path.basename(file))[0]
+    file_path = os.path.join(folder, f'{attack}_{file_name}_{epsilon}.flac')
+
+    # check if the same file already exists. If yes remove the old one
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        print(f'Removed existing file: {file_path}')
+
+    sf.write(file_path, audio, sr, format='FLAC')
+    print(f'Saved the perturbed audio as: {file_path}')
+
+
 def save_perturbed_spec(file, folder, spec, epsilon, attack):
     '''
     Save the perturbed spec in the appropriate folder
@@ -119,7 +141,7 @@ def save_perturbed_spec(file, folder, spec, epsilon, attack):
 
 
 
-class FGSM_attack():
+class attack_single_file():
     def __init__(self, config, model, device, epsilon):
         self.config = config
         self.model = model
@@ -129,26 +151,40 @@ class FGSM_attack():
         self.attack = 'FGSM'
         # folders in which we save the perturbed specs and audios
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.folder_specs = os.path.join(self.current_dir, 'FGSM_data', 'p_specs')
-        #self.folder_audio = '/attacks/FGSM_data/p_audio'
+        self.folder_specs_FGSM = os.path.join(self.current_dir, 'FGSM_data', 'p_specs')
+        self.folder_audio_FGSM = os.path.join(self.current_dir, 'FGSM_data', 'p_audio')
 
-    def attack_single_cached_spec(self, index):
+    def retrieve_single_cached_spec(self, index):
         # retrieve the cached spectrogram
         file, label, spec = retrieve_single_cached_spec(index=index, config=self.config)
 
         # turn the single spec into a mini-batch to be fed to the model
         spec = get_mini_batch(spec, self.device)
 
+        return spec, label, file
+
+    def FGSM(self, spec, label, file):
         # run the FGSM attack on the single spectrogram
         perturbed_spec = FGSM_perturb(spec, self.model, self.epsilon, label, self.device)
 
+        # retrieve the perturbed audio
+        perturbed_audio = spectrogram_inversion(perturbed_spec)
+
         # save the perturbed spectrogram as a numpy file
         save_perturbed_spec(file=file,
-                            folder=self.folder_specs,
+                            folder=self.folder_specs_FGSM,
                             spec=perturbed_spec,
                             epsilon=self.epsilon,
                             attack=self.attack
                             )
+
+        save_perturbed_audio(file=file,
+                             folder=self.folder_audio_FGSM,
+                             audio=perturbed_audio,
+                             sr=16000,
+                             epsilon=self.epsilon,
+                             attack=self.attack)
+
 
 
 

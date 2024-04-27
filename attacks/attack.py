@@ -1,0 +1,48 @@
+"""
+Perform a FGSM attack + evaluation
+- on single file
+- on batches
+
+author: wwang
+"""
+
+
+from src.utils import *
+from attacks_utils import load_spec_model, attack_single_file
+
+
+
+if __name__ == '__main__':
+    '''
+    ########### PRELIMS ###########
+    '''
+
+    seed_everything(1234)
+    set_gpu(-1)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    config_path = '../config/residualnet_train_config.yaml'
+    config = read_yaml(config_path)
+
+    # load the model + load state dict + set to eval
+    model = load_spec_model(device=device, config=config)
+    print('Model loaded')
+    model.eval()
+
+    '''
+    ########### ATTACK ONE SINGLE FILE ###########
+    '''
+
+    file_index = 0
+    epsilon = 0.3
+
+    # create the attack (on single file) object given an epsilon
+    attack = attack_single_file(config, model, device, epsilon)
+
+    # retrieve the cached spec
+    spec, label, file = attack.retrieve_single_cached_spec(index=file_index)
+
+    # perform the FGSM + save spec + save audio
+    attack.FGSM(spec, label, file)
+
+    # TODO test the model on the perturbed audio
