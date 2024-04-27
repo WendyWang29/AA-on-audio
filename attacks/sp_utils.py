@@ -6,6 +6,21 @@ import librosa
 import numpy as np
 import math
 import scipy.signal.windows as windows
+from src.audio_utils import read_audio
+from src.resnet_features import compute_spectrum
+
+def get_spectrogram_from_audio(audio_path):
+    audio, fs = read_audio(audio_path,
+                           dur=180,
+                           fs=16000,
+                           trim=False,
+                           int_type=False,
+                           windowing=False)
+
+    spec = compute_spectrum(audio)
+    return spec
+
+
 
 def recover_mag_spec(power_spec):
     # recover linear power spec from dB

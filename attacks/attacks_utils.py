@@ -1,8 +1,5 @@
 """
 ATTACK SCRIPTS
-
-class attack_single_file
-+ all of its methods
 """
 import torch
 import os
@@ -13,7 +10,8 @@ import soundfile as sf
 import torch.nn as nn
 from src.resnet_model import SpectrogramModel
 from src.resnet_utils import get_features
-from sp_utils import spectrogram_inversion
+from sp_utils import spectrogram_inversion, get_spectrogram_from_audio
+
 
 
 def load_spec_model(device, config):
@@ -95,6 +93,20 @@ def FGSM_perturb(spec, model, epsilon, GT, device):
 
     return p_spec
 
+def spec_to_tensor(spec, device):
+    X_p_batch = np.expand_dims(spec, axis=0)  # ndarray
+    X_p_batch_tensor = torch.from_numpy(X_p_batch).to(device)  # tensor
+    X_p = X_p_batch_tensor
+    X_p.requires_grad = True
+    return X_p
+
+def get_class(out):
+    score_p = out[0, 0] - out[0, 1]
+    if score_p > 0:
+        pred_p = 0
+    else:
+        pred_p = 1
+    return pred_p
 
 def save_perturbed_audio(file, folder, audio, sr, epsilon, attack):
     # ensure folder path exists
@@ -111,7 +123,6 @@ def save_perturbed_audio(file, folder, audio, sr, epsilon, attack):
 
     sf.write(file_path, audio, sr, format='FLAC')
     print(f'Saved the perturbed audio as: {file_path}')
-
 
 def save_perturbed_spec(file, folder, spec, epsilon, attack):
     '''
@@ -138,7 +149,10 @@ def save_perturbed_spec(file, folder, spec, epsilon, attack):
     np.save(file_path, spec)
     print(f'Saved the perturbed spec as: {file_path}')
 
-
+def evaluate_spec(spec, model, device):
+    spec = spec_to_tensor(spec,device)
+    out = model(spec)
+    return out
 
 
 class Attack:
@@ -154,6 +168,18 @@ class Attack:
         # turn the single spec into a mini-batch to be fed to the model
         spec = get_mini_batch(spec, self.device)
         return spec, label, file
+
+    def evaluate_single(self, label, perturbed_spec, audio_path, perturbed_audio):
+        out_spec = evaluate_spec(perturbed_spec, self.model, self.device)
+        print(f'Model output for the perturbed spectrogram is: {out_spec}')
+        print(f'The predicted class is {get_class(out_spec)} and the GT label is {label}')
+
+        perturbed_audio_spec = get_spectrogram_from_audio(audio_path)
+        out_audio = evaluate_spec(perturbed_audio_spec, self.model, self.device)
+        print(f'Model output for the perturbed audio is: {out_audio}')
+        print(f'The predicted class is {get_class(out_audio)} and the GT label is {label}')
+
+
 
     def attack_batch(self):
         pass
@@ -192,6 +218,8 @@ class FGSMAttack(Attack):
                              sr=16000,
                              epsilon=self.epsilon,
                              attack=attack)
+
+        self.evaluate_single(label, perturbed_spec, file, perturbed_audio)
 
 
 
