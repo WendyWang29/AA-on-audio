@@ -8,7 +8,7 @@ author: wwang
 
 
 from src.utils import *
-from attacks_utils import load_spec_model, attack_single_file
+from attacks_utils import load_spec_model, FGSMAttack
 
 
 
@@ -37,12 +37,8 @@ if __name__ == '__main__':
     epsilon = 0.3
 
     # create the attack (on single file) object given an epsilon
-    attack = attack_single_file(config, model, device, epsilon)
+    FGSM_attack = FGSMAttack(epsilon, config, model, device)
 
-    # retrieve the cached spec
-    spec, label, file = attack.retrieve_single_cached_spec(index=file_index)
-
-    # perform the FGSM + save spec + save audio
-    attack.FGSM(spec, label, file)
-
+    # perform the attack + save perturbed audio and spec
+    FGSM_attack.attack_single(file_index)
     # TODO test the model on the perturbed audio
