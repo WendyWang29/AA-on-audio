@@ -34,11 +34,16 @@ if __name__ == '__main__':
     '''
 
     file_index = 0
-    epsilon = 0.4
+    epsilon = 0.6
 
     # create the attack (on single file) object given an epsilon
     FGSM_attack = FGSMAttack(epsilon, config, model, device)
 
     # perform the attack + save perturbed audio and spec
-    FGSM_attack.attack_single(file_index)
-    # TODO test the model on the perturbed audio
+    """
+    VALID ATTACKS:
+    'FGSM': normal attack
+    'FGSM_1' : modified FGSM attack
+    """
+    FGSM_attack.attack_single(file_index, 'FGSM_1')
+    # TODO find an attack that works on audio too

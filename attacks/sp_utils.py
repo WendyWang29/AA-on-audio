@@ -4,6 +4,8 @@ SIGNAL PROCESSING UTILS
 """
 import librosa
 import numpy as np
+import os
+import pandas as pd
 import math
 import scipy.signal.windows as windows
 from src.audio_utils import read_audio
@@ -21,6 +23,19 @@ def get_spectrogram_from_audio(audio_path):
     return spec
 
 
+def retrieve_single_audio(config, index):
+    df_eval = pd.read_csv(os.path.join('..', config["df_eval_path"]))
+
+    # get list of all eval files and labels
+    file_eval = list(df_eval['path'])
+    label_eval = list(df_eval['label'])
+
+    # get one single file and its label given an index
+    file = file_eval[index]
+    X, fs = read_audio(file)
+    # print(f'File {0} is {X.size} samples long with fs={fs}')
+
+    return X
 
 def recover_mag_spec(power_spec):
     # recover linear power spec from dB
@@ -131,6 +146,7 @@ def griffin_lim(magnitude_spectrogram, n_fft, hop_length, init_phase, num_iterat
         magnitude_spectrogram (2D numpy array): Magnitude spectrogram of the signal.
         n_fft (int): Size of the FFT window.
         hop_length (int): Number of samples between successive frames.
+        * init_phase: phase info from the original audio file
         num_iterations (int): Number of iterations for the phase reconstruction (default: 100).
 
     Returns:
@@ -151,21 +167,49 @@ def griffin_lim(magnitude_spectrogram, n_fft, hop_length, init_phase, num_iterat
     return audio_signal
 
 
-def spectrogram_inversion(spec):
+def spectrogram_inversion(config, index, spec, phase_info=True, phase_to_use=None):
+    '''
+    Inversion of a spectrogram.
+    Could be done with original phase (just an ISTFT) or without (improved Griffin-Lim)
+
+    :param config: config file (for getting the audio file path)
+    :param index: index of the audio file being used
+    :param spec: spectrogram on which to perform the inversion
+    :param phase_info: flag (True or False)
+    :param phase_to_use: phase info from an already converted audio
+    :return: audio file (array)
+    '''
+
     # recover the magnitude spectrogram from the power spectrogram
     mag_spec = recover_mag_spec(spec)
 
-    # recover a first audio from the SPSI
-    SPSI_audio = spsi(msgram=mag_spec, n_fft=2048, hop_length=512)
+    if phase_info:
+        if phase_to_use is not None:
+            audio = librosa.istft(mag_spec * np.exp(1j*phase_to_use), n_fft=2048, hop_length=512)
+            phase = None
+        else:
+            # get the phase info from the original audio file
+            X = retrieve_single_audio(config, index)
+            phase = np.angle(librosa.stft(y=X, n_fft=2048, hop_length=512, center=False))
 
-    # get the initial phase from the SPSI audio
-    phase = np.angle(librosa.stft(y=SPSI_audio, n_fft=2048, hop_length=512, center=False))
+            # reconstruct the audio using magnitude and phase
+            audio = librosa.istft(mag_spec * np.exp(1j*phase), n_fft=2048, hop_length=512)
 
-    # get the audio using Griffin Lim
-    audio = griffin_lim(magnitude_spectrogram=mag_spec,
-                        n_fft=2048,
-                        hop_length=512,
-                        num_iterations=100,
-                        init_phase=phase)
+        print('done')
 
-    return audio
+    else:
+        # recover a first audio reconstruction from the SPSI
+        SPSI_audio = spsi(msgram=mag_spec, n_fft=2048, hop_length=512)
+
+        # get the initial phase from the SPSI audio
+        phase = np.angle(librosa.stft(y=SPSI_audio, n_fft=2048, hop_length=512, center=False))
+
+        # get the audio using Griffin Lim
+        audio = griffin_lim(magnitude_spectrogram=mag_spec,
+                            n_fft=2048,
+                            hop_length=512,
+                            num_iterations=100,
+                            init_phase=phase,
+                            )
+
+    return audio, phase
