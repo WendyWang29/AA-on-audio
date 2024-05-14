@@ -22,7 +22,6 @@ def get_spectrogram_from_audio(audio_path):
     spec = compute_spectrum(audio)
     return spec
 
-
 def retrieve_single_audio(config, index):
     df_eval = pd.read_csv(os.path.join('..', config["df_eval_path"]))
 
@@ -194,8 +193,6 @@ def spectrogram_inversion(config, index, spec, phase_info=True, phase_to_use=Non
 
             # reconstruct the audio using magnitude and phase
             audio = librosa.istft(mag_spec * np.exp(1j*phase), n_fft=2048, hop_length=512)
-
-        print('done')
 
     else:
         # recover a first audio reconstruction from the SPSI

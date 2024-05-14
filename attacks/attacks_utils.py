@@ -55,8 +55,6 @@ def retrieve_single_cached_spec(config, index):
 
     return file, label, spec
 
-
-
 def get_mini_batch(spec, device):
     """
     Given one single spec we create a mini batch that can be passed to the model
@@ -147,6 +145,8 @@ def evaluate_spec(spec, model, device):
     return out
 
 
+
+
 def FGSM_perturb(spec, model, epsilon, GT, device):
     # Based on https://github.com/ymerkli/fgsm-attack/blob/master/fgsm_attack.py
 
@@ -232,20 +232,21 @@ class Attack:
         return spec, label, file
 
     def evaluate_single(self, label, perturbed_spec, audio_path, perturbed_audio):
+        # the perturbed spectrogram is directly classified (no audio conversion)
         out_spec = evaluate_spec(perturbed_spec, self.model, self.device)
-        print(f'Model output for the perturbed spectrogram is: {out_spec}')
-        print(f'With the spectrogram the predicted class is {get_class(out_spec)}. GT label is {label}')
+        print(f'The model output for the perturbed spectrogram is: {out_spec}')
+        print(f'The perturbed spectrogram is predicted as: {get_class(out_spec)}. GT label is {label}')
 
+        # from the perturbed audio we compute again the spectrogram
         perturbed_audio_spec = get_spectrogram_from_audio(audio_path)
         out_audio = evaluate_spec(perturbed_audio_spec, self.model, self.device)
-        print(f'Model output for the perturbed audio is: {out_audio}')
-        print(f'With the audio the predicted class is {get_class(out_audio)}. GT label is {label}')
+        print(f'The model output for the perturbed audio is: {out_audio}')
+        print(f'The perturbed audio is predicetd as: {get_class(out_audio)}. GT label is {label}')
 
 
 
     def attack_batch(self):
         pass
-
 
 class FGSMAttack(Attack):
     def __init__(self, epsilon, config, model, device):
