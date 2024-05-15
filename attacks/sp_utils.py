@@ -177,6 +177,8 @@ def spectrogram_inversion(config, index, spec, phase_info=True, phase_to_use=Non
     :param phase_info: flag (True or False)
     :param phase_to_use: phase info from an already converted audio
     :return: audio file (array)
+
+    https://dsp.stackexchange.com/questions/9877/reconstruction-of-audio-signal-from-spectrogram/13401#13401
     '''
 
     # recover the magnitude spectrogram from the power spectrogram

@@ -84,13 +84,7 @@ def spec_to_tensor(spec, device):
     X_p.requires_grad = True
     return X_p
 
-def get_class(out):
-    score_p = out[0, 0] - out[0, 1]
-    if score_p > 0:
-        pred_p = 0
-    else:
-        pred_p = 1
-    return pred_p
+
 
 def save_perturbed_audio(file, folder, audio, sr, epsilon, attack):
 
@@ -235,13 +229,14 @@ class Attack:
         # the perturbed spectrogram is directly classified (no audio conversion)
         out_spec = evaluate_spec(perturbed_spec, self.model, self.device)
         print(f'The model output for the perturbed spectrogram is: {out_spec}')
-        print(f'The perturbed spectrogram is predicted as: {get_class(out_spec)}. GT label is {label}')
+        print(f'The perturbed spectrogram is predicted as: {get_pred_class(out_spec)}. GT label is {label}')
 
         # from the perturbed audio we compute again the spectrogram
-        perturbed_audio_spec = get_spectrogram_from_audio(audio_path)
-        out_audio = evaluate_spec(perturbed_audio_spec, self.model, self.device)
+        #perturbed_audio_spec = get_spectrogram_from_audio(audio_path)
+        spec = compute_spectrum(perturbed_audio)
+        out_audio = evaluate_spec(spec, self.model, self.device)
         print(f'The model output for the perturbed audio is: {out_audio}')
-        print(f'The perturbed audio is predicetd as: {get_class(out_audio)}. GT label is {label}')
+        print(f'The perturbed audio is predicted as: {get_pred_class(out_audio)}. GT label is {label}')
 
 
 
