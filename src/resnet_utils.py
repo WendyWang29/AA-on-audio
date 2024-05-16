@@ -1,5 +1,6 @@
 import sys
 
+import numpy as np
 import pandas as pd
 from torch import Tensor
 from torch import nn
@@ -150,7 +151,7 @@ def get_loss_resnet(data_loader, model, device):
     return running_loss
 
 
-def get_features(wav_path, features, args, X, cached=True, force=False):
+def get_features(wav_path, features, args, X, cached=False, force=False):
     """
     Extract features chosen by features argument.
 
@@ -225,16 +226,20 @@ class LoadTrainData_ResNet(Dataset):
         network_input_shape = 28 * self.win_len
 
         if feature_len < network_input_shape:
-            X = np.pad(X, ((0,0), (0, network_input_shape - feature_len)))
-            feature_len = X.shape[1]
+            num_repeats = int(network_input_shape/feature_len) + 1
+            X = np.tile(X, (1, num_repeats))
+            # feature_len = X.shape[1]
 
-        last_valid_start_sample = feature_len - network_input_shape
-        if not last_valid_start_sample == 0:
-            start_sample = random.randrange(start=0, stop=last_valid_start_sample)
-        else:
-            start_sample = 0
-        X_win = X[:, start_sample: start_sample + network_input_shape]
+        X_win = X[:, : network_input_shape]
         X_win = Tensor(X_win)
+
+        # last_valid_start_sample = feature_len - network_input_shape
+        # if not last_valid_start_sample == 0:
+        #     start_sample = random.randrange(start=0, stop=last_valid_start_sample)
+        # else:
+        #     start_sample = 0
+        # X_win = X[:, start_sample: start_sample + network_input_shape]
+        # X_win = Tensor(X_win)
 
         return X_win, y
 
@@ -262,8 +267,8 @@ class LoadEvalData_ResNet(Dataset):
         network_input_shape = 28 * self.win_len
 
         if feature_len < network_input_shape:
-            X = np.pad(X, ((0,0), (0, network_input_shape - feature_len)))
-            feature_len = X.shape[1]
+            num_repeats = int(network_input_shape/feature_len) + 1
+            X = np.tile(X, (1, num_repeats))
 
         X_win = X[:, : network_input_shape]
         X_win = Tensor(X_win)

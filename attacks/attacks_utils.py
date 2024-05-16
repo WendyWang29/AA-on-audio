@@ -33,6 +33,7 @@ def load_spec_model(device, config):
     resnet_spec_model.load_state_dict(torch.load(os.path.join('..', config["model_path_spec"]), map_location=device))
     return resnet_spec_model
 
+
 def retrieve_single_cached_spec(config, index):
     df_eval = pd.read_csv(os.path.join('..', config["df_eval_path"]))
 
@@ -171,44 +172,6 @@ def FGSM_perturb(spec, model, epsilon, GT, device):
     return p_spec, phase
 
 
-def FGSM_perturb_1(spec, model, epsilon, GT, device, config, index):
-    print('Peforming the modified FGSM perturbation')
-    # from mini batch to numpy array
-    spec = spec.squeeze(0).detach().cpu().numpy()
-
-    audio_from_spec, _ = spectrogram_inversion(config,
-                                                index,
-                                                spec,
-                                                phase_info=True,
-                                                phase_to_use=None)
-
-    spec_from_audio = compute_spectrum(audio_from_spec)  # float64
-    phase = np.angle(librosa.stft(y=audio_from_spec, n_fft=2048, hop_length=512, center=False))
-    spec = get_mini_batch(spec_from_audio, device).float() # convert to float32
-
-    # from numpy array to mini batch
-    spec.requires_grad = True
-
-    out = model(spec)
-    pred = get_pred_class(out)
-    print(f'The clean file is predicted to be class {pred}. The GT class is {GT}')
-
-    L = nn.NLLLoss()
-    loss = None
-    label = torch.tensor([GT]).to(device)
-    loss = L(out, label)
-    model.zero_grad()
-
-    loss.backward()
-    grad = spec.grad
-
-    # apply the perturbation
-    p_spec = spec + epsilon * grad.sign()
-    p_spec = p_spec.squeeze(0).detach()
-    p_spec = p_spec.cpu()
-    p_spec = p_spec.numpy()
-
-    return p_spec, phase
 
 
 class Attack:
@@ -254,9 +217,6 @@ class FGSMAttack(Attack):
         if type_of_attack == 'FGSM':
             spec_folder = 'p_specs'
             audio_folder = 'p_audio'
-        elif type_of_attack == 'FGSM_1':
-            spec_folder = 'p_specs_1'
-            audio_folder = 'p_audio_1'
         else:
             print('Invalid type of attack')
             sys.exit(1)
@@ -268,12 +228,11 @@ class FGSMAttack(Attack):
 
         """
         'FGSM' = run the classic FGSM attack
-        'FGSM_1' = run the modified FGSM
         """
         if type_of_attack == 'FGSM':
             perturbed_spec, phase = FGSM_perturb(spec, self.model, self.epsilon, label, self.device)
-        elif type_of_attack == 'FGSM_1':
-            perturbed_spec, phase = FGSM_perturb_1(spec, self.model, self.epsilon, label, self.device, self.config, index)
+        else:
+            print('No attack')
 
 
         # retrieve the perturbed audio
