@@ -43,7 +43,6 @@ if __name__ == '__main__':
     """
     VALID ATTACKS:
     'FGSM': normal attack
-    'FGSM_1' : modified FGSM attack
     """
     FGSM_attack.attack_single(file_index, 'FGSM')
     # TODO find black box attack etc etc
