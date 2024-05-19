@@ -50,7 +50,7 @@ def resnet_eval(model, df_eval, save_path, config, device):
         print('Scores saved to {}'.format(save_path))
 
 
-def init_eval(config):
+def init_eval(config, attack=None, epsilon=None):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -60,8 +60,15 @@ def init_eval(config):
         resnet_spec_model = SpectrogramModel().to(device)
         resnet_spec_model.load_state_dict(torch.load(config['model_path_spec'], map_location=device))
 
-        save_path = './eval/scores_resnet_spec_eval.csv'
-        resnet_eval(resnet_spec_model, df_eval, save_path, config, device)
+        if attack is not None:
+            # df_eval will be a list of perturbed flac files
+            epsilon = str(epsilon).replace('.', 'dot')
+            save_path = f'./eval/scores_resnet_spec_eval_{attack}_{epsilon}.csv'
+            resnet_eval(resnet_spec_model, df_eval, save_path, config, device)
+        else:
+            # no attack performed
+            save_path = './eval/scores_resnet_spec_eval.csv'
+            resnet_eval(resnet_spec_model, df_eval, save_path, config, device)
 
     elif config['features'] == 'mfcc':
         resnet_mfcc_model = MFCCModel().to(device)
@@ -79,5 +86,5 @@ if __name__ == '__main__':
     config_path = 'config/residualnet_train_config.yaml'
     config_res = read_yaml(config_path)
 
-    init_eval(config_res)
+    init_eval(config_res, attack=None, epsilon=None)
 

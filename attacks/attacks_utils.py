@@ -14,7 +14,7 @@ import torch.nn as nn
 from src.resnet_model import SpectrogramModel
 from src.resnet_utils import get_features
 from src.audio_utils import read_audio
-from sp_utils import spectrogram_inversion, get_spectrogram_from_audio
+from attacks.sp_utils import spectrogram_inversion, get_spectrogram_from_audio
 from src.resnet_features import compute_spectrum
 
 logging.getLogger('numba').setLevel(logging.WARNING)
