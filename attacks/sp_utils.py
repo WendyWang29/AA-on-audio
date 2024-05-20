@@ -166,6 +166,37 @@ def griffin_lim(magnitude_spectrogram, n_fft, hop_length, init_phase, num_iterat
     return audio_signal
 
 
+def spectrogram_inversion_batch(config, index, spec, phase_info=True):
+    '''
+    https://dsp.stackexchange.com/questions/9877/reconstruction-of-audio-signal-from-spectrogram/13401#13401
+    '''
+    mag_spec = recover_mag_spec(spec)
+    len = mag_spec.shape[1]
+
+    if phase_info:
+        X = retrieve_single_audio(config, index)
+        phase = np.angle(librosa.stft(y=X, n_fft=2048, hop_length=512, center=False))
+        phase = phase[:, :len]
+        audio = librosa.istft(mag_spec * np.exp(1j * phase), n_fft=2048, hop_length=512)
+    else:
+        # recover a first audio reconstruction from the SPSI
+        SPSI_audio = spsi(msgram=mag_spec, n_fft=2048, hop_length=512)
+
+        # get the initial phase from the SPSI audio
+        phase = np.angle(librosa.stft(y=SPSI_audio, n_fft=2048, hop_length=512, center=False))
+
+        # get the audio using Griffin Lim
+        audio = griffin_lim(magnitude_spectrogram=mag_spec,
+                            n_fft=2048,
+                            hop_length=512,
+                            num_iterations=100,
+                            init_phase=phase,
+                            )
+
+    return audio, phase
+
+
+
 def spectrogram_inversion(config, index, spec, phase_info=True, phase_to_use=None):
     '''
     Inversion of a spectrogram.
@@ -178,7 +209,7 @@ def spectrogram_inversion(config, index, spec, phase_info=True, phase_to_use=Non
     :param phase_to_use: phase info from an already converted audio
     :return: audio file (array)
 
-    https://dsp.stackexchange.com/questions/9877/reconstruction-of-audio-signal-from-spectrogram/13401#13401
+
     '''
 
     # recover the magnitude spectrogram from the power spectrogram

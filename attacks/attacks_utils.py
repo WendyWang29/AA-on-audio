@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 from src.resnet_utils import LoadAttackData_ResNet
 from src.resnet_utils import get_features
 from src.audio_utils import read_audio
-from attacks.sp_utils import spectrogram_inversion, get_spectrogram_from_audio
+from attacks.sp_utils import spectrogram_inversion_batch, spectrogram_inversion, get_spectrogram_from_audio
 from src.resnet_features import compute_spectrum
 
 logging.getLogger('numba').setLevel(logging.WARNING)
@@ -202,28 +202,18 @@ def FGSM_perturb_batch(data_loader, model, epsilon, config, device, folder_audio
             # working on each row of the matrix of perturbed specs
             sliced_spec = perturbed_batch[i][:, :time_frames[i]]
 
-            audio, _ = spectrogram_inversion(config=config,
+            audio, _ = spectrogram_inversion_batch(config=config,
                                              index=index[i],
                                              spec=sliced_spec,
-                                             phase_info=True,
-                                             phase_to_use=None)
-            save_perturbed_audio(file=file_eval[i],
+                                             phase_info=True)
+
+            save_perturbed_audio(file=file_eval[index[i]],
                                  folder=folder_audio,
                                  audio=audio,
                                  sr=16000,
                                  epsilon=epsilon,
                                  attack='FGSM')
-
-
-
-
-
-
-
-
-
-
-
+    print('Finished the first batch')
 
 
 

@@ -12,9 +12,35 @@ from src.resnet_model import SpectrogramModel, MFCCModel
 from src.resnet_utils import LoadEvalData_ResNet
 from src.utils import *
 from tqdm import tqdm
+import csv
 from sklearn import model_selection
 import os
 
+
+def create_csv(attack, epsilon):
+    # specify directory containing the flac files
+    epsilon_dot_notation = str(epsilon).replace('.', 'dot')
+    flac_directory = os.path.join('attacks', f'{attack}_data', f'{attack}_dataset_{epsilon_dot_notation}')
+
+    # specify full path in which csv file has to be saved
+    csv_location = os.path.join('eval', f'flac_{attack}_{epsilon_dot_notation}.csv')
+    if os.path.exists(csv_location):
+        os.remove(csv_location)
+        print(f"Existing file '{csv_location}' has been removed.")
+
+    # create list of flac files
+    flac_files = [f for f in os.listdir(flac_directory) if f.endswith('.flac')]
+
+    # create and write the csv file
+    with open(csv_location, 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        # write the header
+        csvwriter.writerow(['', 'path'])
+        # write the data rows
+        for index, filename in enumerate(flac_files, start=1):
+            csvwriter.writerow([filename, os.path.join(flac_directory, filename)])
+
+    return csv_location
 
 def resnet_eval(model, df_eval, save_path, config, device):
 
@@ -54,28 +80,30 @@ def init_eval(config, attack=None, epsilon=None):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    df_eval = pd.read_csv(config["df_eval_path"])
-
     if config['features'] == 'spec':
         resnet_spec_model = SpectrogramModel().to(device)
         resnet_spec_model.load_state_dict(torch.load(config['model_path_spec'], map_location=device))
 
         if attack is not None:
             # df_eval will be a list of perturbed flac files
+            path_to_csv = create_csv(attack, epsilon)
+            df_eval = pd.read_csv(path_to_csv)
             epsilon = str(epsilon).replace('.', 'dot')
             save_path = f'./eval/scores_resnet_spec_eval_{attack}_{epsilon}.csv'
             resnet_eval(resnet_spec_model, df_eval, save_path, config, device)
         else:
             # no attack performed
+            df_eval = pd.read_csv(config["df_eval_path"])
             save_path = './eval/scores_resnet_spec_eval.csv'
             resnet_eval(resnet_spec_model, df_eval, save_path, config, device)
 
     elif config['features'] == 'mfcc':
-        resnet_mfcc_model = MFCCModel().to(device)
-        resnet_mfcc_model.load_state_dict(torch.load(config['model_path_mfcc'], map_location=device))
-
-        save_path = './eval/scores_resnet_mfcc_eval.csv'
-        resnet_eval(resnet_mfcc_model, df_eval, save_path, config, device)
+        print('ACtually we are not working with MFCCs...')
+        # resnet_mfcc_model = MFCCModel().to(device)
+        # resnet_mfcc_model.load_state_dict(torch.load(config['model_path_mfcc'], map_location=device))
+        #
+        # save_path = './eval/scores_resnet_mfcc_eval.csv'
+        # resnet_eval(resnet_mfcc_model, df_eval, save_path, config, device)
 
 
 if __name__ == '__main__':
@@ -86,5 +114,5 @@ if __name__ == '__main__':
     config_path = 'config/residualnet_train_config.yaml'
     config_res = read_yaml(config_path)
 
-    init_eval(config_res, attack=None, epsilon=None)
+    init_eval(config_res, attack='FGSM', epsilon=2.0)
 
