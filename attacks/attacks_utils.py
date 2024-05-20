@@ -200,7 +200,7 @@ def FGSM_perturb_batch(data_loader, model, epsilon, config, device, folder_audio
 
         for i in range(perturbed_batch.shape[0]):
             # working on each row of the matrix of perturbed specs
-            sliced_spec = perturbed_batch[i][:, :41]
+            sliced_spec = perturbed_batch[i][:, :time_frames[i]]
 
             audio, _ = spectrogram_inversion(config=config,
                                              index=index[i],
