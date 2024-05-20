@@ -11,7 +11,10 @@ import librosa
 import logging
 import soundfile as sf
 import torch.nn as nn
+from tqdm import tqdm
 from src.resnet_model import SpectrogramModel
+from torch.utils.data import DataLoader
+from src.resnet_utils import LoadAttackData_ResNet
 from src.resnet_utils import get_features
 from src.audio_utils import read_audio
 from attacks.sp_utils import spectrogram_inversion, get_spectrogram_from_audio
@@ -101,10 +104,10 @@ def save_perturbed_audio(file, folder, audio, sr, epsilon, attack):
     # check if the same file already exists. If yes remove the old one
     if os.path.exists(file_path):
         os.remove(file_path)
-        print(f'Removed existing file: {file_path}')
+        #print(f'Removed existing file: {file_path}')
 
     sf.write(file_path, audio, sr, format='FLAC')
-    print(f'Saved the perturbed audio as: {file_path}')
+    #print(f'Saved the perturbed audio as: {file_path}')
 
 def save_perturbed_spec(file, folder, spec, epsilon, attack):
     '''
@@ -172,6 +175,58 @@ def FGSM_perturb(spec, model, epsilon, GT, device):
     return p_spec, phase
 
 
+def FGSM_perturb_batch(data_loader, model, epsilon, config, device, folder_audio):
+    print('FGSM attack starts...')
+
+    df_eval = pd.read_csv(os.path.join('..', config["df_eval_path"]))
+    file_eval = list(df_eval['path'])
+
+    L = nn.NLLLoss()
+
+    for batch_x, batch_y, time_frames, index in tqdm(data_loader, total=len(data_loader)):
+        batch_x = batch_x.to(device)
+        batch_y = batch_y.to(device)
+        batch_x.requires_grad = True
+        out = model(batch_x)
+        loss = L(out, batch_y)
+        model.zero_grad()
+        loss.backward()
+        grad = batch_x.grad.data
+        perturbed_batch = batch_x + epsilon * grad.sign()
+
+        perturbed_batch = perturbed_batch.squeeze(0).detach()
+        perturbed_batch = perturbed_batch.cpu()
+        perturbed_batch = perturbed_batch.numpy()
+
+        for i in range(perturbed_batch.shape[0]):
+            # working on each row of the matrix of perturbed specs
+            sliced_spec = perturbed_batch[i][:, :41]
+
+            audio, _ = spectrogram_inversion(config=config,
+                                             index=index[i],
+                                             spec=sliced_spec,
+                                             phase_info=True,
+                                             phase_to_use=None)
+            save_perturbed_audio(file=file_eval[i],
+                                 folder=folder_audio,
+                                 audio=audio,
+                                 sr=16000,
+                                 epsilon=epsilon,
+                                 attack='FGSM')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class Attack:
@@ -201,10 +256,22 @@ class Attack:
         print(f'The model output for the perturbed audio is: {out_audio}')
         print(f'The perturbed audio is predicted as: {get_pred_class(out_audio)}. GT label is {label}')
 
+    def attack_dataset(self, eval_csv):
+        eval_labels = dict(zip(eval_csv['path'], eval_csv['label']))
+        file_eval = list(eval_csv['path'])
 
+        # get the data loader and return the dataloader
+        feat_set = LoadAttackData_ResNet(list_IDs=file_eval,
+                                        labels=eval_labels,
+                                        win_len=self.config['win_len'],
+                                        config=self.config)
+        feat_loader = DataLoader(feat_set,
+                                 batch_size=self.config['eval_batch_size'],
+                                 shuffle=False,
+                                 num_workers=15)
+        del feat_set, eval_labels
+        return feat_loader
 
-    def attack_batch(self):
-        pass
 
 class FGSMAttack(Attack):
     def __init__(self, epsilon, config, model, device):
@@ -257,6 +324,26 @@ class FGSMAttack(Attack):
                              attack=type_of_attack)
 
         self.evaluate_single(label, perturbed_spec, file, perturbed_audio)
+
+    def attack_dataset(self, eval_csv):
+        feat_loader = super().attack_dataset(eval_csv)
+
+        # create folder in which I save the perturbed audios (if it does not already exist)
+        epsilon = str(self.epsilon).replace('.', 'dot')
+        audio_folder = f'FGSM_dataset_{epsilon}'
+        self.current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.audio_folder = os.path.join(self.current_dir, 'FGSM_data', audio_folder)
+        os.makedirs(self.audio_folder, exist_ok=True)
+        print(f'Saving the perturbed dataset in {self.audio_folder}')
+
+        # perform the attack on batches (given by the data loader)
+        FGSM_perturb_batch(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder)
+
+
+
+
+
+
 
 
 

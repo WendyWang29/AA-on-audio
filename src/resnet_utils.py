@@ -200,6 +200,47 @@ def get_features(wav_path, features, args, X, cached=False, force=False):
         return get_feats(wav_path, X)
 
 
+
+class LoadAttackData_ResNet(Dataset):
+    def __init__(self, list_IDs, labels, win_len, config):
+        """
+        self.list_IDs	: list of strings (each string: utt key),
+        self.labels      : dictionary (key: utt key, value: label integer)
+        """
+
+        self.list_IDs = list_IDs
+        self.labels = labels
+        self.win_len = win_len
+        self.config = config
+
+    def __len__(self):
+        return len(self.list_IDs)
+
+    def __getitem__(self, index):
+        track = self.list_IDs[index]  # path to cached spectrogram
+        y = self.labels[track]   # get the corresponding GT label
+
+        X = get_features(track, self.config['features'], self.config, X=None, cached=True)
+
+        feature_len = X.shape[1]
+
+        network_input_shape = 28 * self.win_len
+
+        if feature_len < network_input_shape:
+            num_repeats = int(network_input_shape / feature_len) + 1
+            X = np.tile(X, (1, num_repeats))
+            # feature_len = X.shape[1]
+
+        X_win = X[:, : network_input_shape]
+        X_win = Tensor(X_win)
+
+        return X_win, y, feature_len, index
+
+
+
+
+
+
 class LoadTrainData_ResNet(Dataset):
     def __init__(self, list_IDs, labels, win_len, config):
         """

@@ -33,8 +33,8 @@ if __name__ == '__main__':
     ########### ATTACK ONE SINGLE FILE ###########
     '''
 
-    file_index = 0
-    epsilon = 2.0
+    file_index = 1
+    epsilon = 1.5
 
     # create the attack (on single file) object given an epsilon
     FGSM_attack = FGSMAttack(epsilon, config, model, device)
