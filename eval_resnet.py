@@ -35,10 +35,10 @@ def create_csv(attack, epsilon):
     with open(csv_location, 'w', newline='') as csvfile:
         csvwriter = csv.writer(csvfile)
         # write the header
-        csvwriter.writerow(['', 'path'])
+        csvwriter.writerow(['path'])
         # write the data rows
-        for index, filename in enumerate(flac_files, start=1):
-            csvwriter.writerow([filename, os.path.join(flac_directory, filename)])
+        for index, filename in enumerate(flac_files):
+            csvwriter.writerow([os.path.join(flac_directory, filename)])
 
     return csv_location
 
