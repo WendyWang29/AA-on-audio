@@ -61,18 +61,31 @@ def resnet_eval(model, df_eval, save_path, config, device):
     with torch.no_grad():
 
         for feat_batch, utt_id in tqdm(feat_loader, total=len(feat_loader)):
-            fname_list = []
-            score_list = []
+            #fname_list = []
+            #score_list = []
             feat_batch = feat_batch.to(torch.float32).to(device)
             score = model(feat_batch)
-            score = (score[:, 0] - score[:, 1]).data.cpu().numpy().ravel()
-            fname_list.extend(utt_id)
-            score_list.extend(score.tolist())
+            probabilities = torch.exp(score)
+            probabilities = probabilities.detach().cpu().numpy()
 
-            with open(save_path, 'a+') as fh:
-                for f, cm in zip(fname_list, score_list):
-                    fh.write('{} {}\n'.format(f, cm))
-            fh.close()
+            with open(save_path, mode='a+', newline='') as file:
+                writer = csv.writer(file)
+                if file.tell() == 0:
+                    writer.writerow(['Filename', 'Pred.class 0', 'Pred.class 1'])
+                for i in range(len(utt_id)):
+                    row = [utt_id[i], probabilities[i, 0], probabilities[i, 1]]
+                    writer.writerow(row)
+
+
+
+            #score = (score[:, 0] - score[:, 1]).data.cpu().numpy().ravel()
+            # fname_list.extend(utt_id)
+            # score_list.extend(score.tolist())
+            #
+            # with open(save_path, 'a+') as fh:
+            #     for f, cm in zip(fname_list, score_list):
+            #         fh.write('{} {} {}\n'.format(f, cm))
+            # fh.close()
         print('Scores saved to {}'.format(save_path))
 
 
@@ -89,12 +102,12 @@ def init_eval(config, attack=None, epsilon=None):
             path_to_csv = create_csv(attack, epsilon)
             df_eval = pd.read_csv(path_to_csv)
             epsilon = str(epsilon).replace('.', 'dot')
-            save_path = f'./eval/scores_resnet_spec_eval_{attack}_{epsilon}.csv'
+            save_path = f'./eval/prob_resnet_spec_eval_{attack}_{epsilon}.csv'
             resnet_eval(resnet_spec_model, df_eval, save_path, config, device)
         else:
             # no attack performed
             df_eval = pd.read_csv(config["df_eval_path"])
-            save_path = './eval/scores_resnet_spec_eval.csv'
+            save_path = './eval/prob_resnet_spec_eval.csv'
             resnet_eval(resnet_spec_model, df_eval, save_path, config, device)
 
     elif config['features'] == 'mfcc':
@@ -114,5 +127,5 @@ if __name__ == '__main__':
     config_path = 'config/residualnet_train_config.yaml'
     config_res = read_yaml(config_path)
 
-    init_eval(config_res, attack='FGSM', epsilon=3.0)
+    init_eval(config_res, attack=None, epsilon=None)
 
