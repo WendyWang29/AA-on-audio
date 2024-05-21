@@ -213,7 +213,7 @@ def FGSM_perturb_batch(data_loader, model, epsilon, config, device, folder_audio
                                  sr=16000,
                                  epsilon=epsilon,
                                  attack='FGSM')
-    print('Finished the first batch')
+
 
 
 
