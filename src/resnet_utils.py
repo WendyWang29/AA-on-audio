@@ -151,7 +151,21 @@ def get_loss_resnet(data_loader, model, device):
     return running_loss
 
 
-def get_features(wav_path, features, args, X, cached=False, force=False):
+def get_features_1(wav_path):
+    """
+    Modified get_features that takes FOR SURE the cached ATTACKED spectrograms
+    (not the clean cached spectrograms in data)
+    NB --> modify manually the epsilon values <--
+    :return: np_array
+    """
+    cache_dir = 'attacks/FGSM_data/FGSM_dataset_0dot0_specs'
+    file_name = f'FGSM_{os.path.splitext(os.path.basename(wav_path))[0]}_0dot0'
+    file_name = os.path.join(cache_dir, file_name + '.npy')
+    data = np.load(file_name, allow_pickle=True)
+    return data
+
+
+def get_features(wav_path, features, args, X, cached=True, force=False):
     """
     Extract features chosen by features argument.
 
@@ -180,6 +194,7 @@ def get_features(wav_path, features, args, X, cached=False, force=False):
 
     if cached:
         cache_dir = args['cache_dir'] + features
+
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
 
@@ -302,6 +317,7 @@ class LoadEvalData_ResNet(Dataset):
     def __getitem__(self, index):
         track = self.list_IDs[index]
         X = get_features(track, self.config['features'], self.config, X=None, cached=True)
+        #X = get_features_1(track)
 
         feature_len = X.shape[1]
 
@@ -317,36 +333,36 @@ class LoadEvalData_ResNet(Dataset):
         return X_win, track
 
 
-def eval():
-
-    set_gpu(-1)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-    seed_everything(1234)
-
-    config_path = '../config/residualnet_train_config.yaml'
-    config_res = read_yaml(config_path)
-
-    assert config_res['features'] in ['mfcc', 'spec'], 'Not supported feature'
-
-    if config_res['features'] == 'mfcc':
-        model_cls = MFCCModel
-    elif config_res['features'] == 'spec':
-        model_cls = SpectrogramModel
-
-    model = model_cls().to(device)
-
-    model_path = os.path.join(config_res['model_folder'], config_res['model_path'])
-    model.load_state_dict(torch.load(model_path))
-    print('Model loaded : {}'.format(model_path))
-
-    df_eval = pd.read_csv(config_res['df_eval_path'], index_col=0)
-
-    d_label_eval = dict(zip(df_eval['Path'], df_eval['Bin_label']))
-    file_eval = list(df_eval['Path'])
-    eval_set = LoadEvalData(list_IDs=file_eval, labels=d_label_eval, win_len=config_res['win_len'], config=config_res)
-    eval_loader = DataLoader(eval_set, batch_size=config_res['batch_size'], shuffle=True, num_workers=32)
-    # del eval_set, d_label_eval
-
-    eval_path = os.path.join(config_res['eval_output'], 'prediction_{}.csv'.format(config_res['features']))
-    produce_evaluation_file(eval_set, model, device, eval_path)
+# def eval():
+#
+#     set_gpu(-1)
+#     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+#
+#     seed_everything(1234)
+#
+#     config_path = '../config/residualnet_train_config.yaml'
+#     config_res = read_yaml(config_path)
+#
+#     assert config_res['features'] in ['mfcc', 'spec'], 'Not supported feature'
+#
+#     if config_res['features'] == 'mfcc':
+#         model_cls = MFCCModel
+#     elif config_res['features'] == 'spec':
+#         model_cls = SpectrogramModel
+#
+#     model = model_cls().to(device)
+#
+#     model_path = os.path.join(config_res['model_folder'], config_res['model_path'])
+#     model.load_state_dict(torch.load(model_path))
+#     print('Model loaded : {}'.format(model_path))
+#
+#     df_eval = pd.read_csv(config_res['df_eval_path'], index_col=0)
+#
+#     d_label_eval = dict(zip(df_eval['Path'], df_eval['Bin_label']))
+#     file_eval = list(df_eval['Path'])
+#     eval_set = LoadEvalData(list_IDs=file_eval, labels=d_label_eval, win_len=config_res['win_len'], config=config_res)
+#     eval_loader = DataLoader(eval_set, batch_size=config_res['batch_size'], shuffle=True, num_workers=32)
+#     # del eval_set, d_label_eval
+#
+#     eval_path = os.path.join(config_res['eval_output'], 'prediction_{}.csv'.format(config_res['features']))
+#     produce_evaluation_file(eval_set, model, device, eval_path)

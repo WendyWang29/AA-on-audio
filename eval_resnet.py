@@ -13,20 +13,46 @@ from src.resnet_utils import LoadEvalData_ResNet
 from src.utils import *
 from tqdm import tqdm
 import csv
+import re
 from sklearn import model_selection
 import os
 
 
 def create_csv(attack, epsilon):
-    # specify directory containing the flac files
+
     epsilon_dot_notation = str(epsilon).replace('.', 'dot')
     flac_directory = os.path.join('attacks', f'{attack}_data', f'{attack}_dataset_{epsilon_dot_notation}')
 
     # specify full path in which csv file has to be saved
-    csv_location = os.path.join('eval', f'flac_{attack}_{epsilon_dot_notation}.csv')
+    csv_location = os.path.join('eval', f'flac_{attack}_{epsilon_dot_notation}_specs.csv')
     if os.path.exists(csv_location):
         os.remove(csv_location)
         print(f"Existing file '{csv_location}' has been removed.")
+
+    # def extract_number_from_path(file_path):
+    #     match = re.search(r'_(\d+)\.flac$', file_path)
+    #     if match:
+    #         return match.group(1)
+    #     else:
+    #         return None
+    #
+    # transformed_rows = []
+    #
+    # with open(df_eval_original, 'r') as file:
+    #     csv_reader = csv.reader(file)
+    #     for row in csv_reader:
+    #         index = row[0]
+    #         df_eval_original = row[1]
+    #         number = extract_number_from_path(df_eval_original)
+    #         if number is not None:
+    #             new_path = f'attacks/FGSM_data/FGSM_dataset_0dot0/FGSM_LA_E_{number}_{epsilon_dot_notation}.flac'
+    #             transformed_rows.append([new_path])
+    #
+    # with open(csv_location, 'w', newline='') as file:
+    #     csv_writer = csv.writer(file)
+    #     csv_writer.writerow(transformed_rows)
+    #
+    # return csv_location
 
     # create list of flac files
     flac_files = [f for f in os.listdir(flac_directory) if f.endswith('.flac')]
@@ -127,5 +153,5 @@ if __name__ == '__main__':
     config_path = 'config/residualnet_train_config.yaml'
     config_res = read_yaml(config_path)
 
-    init_eval(config_res, attack='FGSM', epsilon=3.0)
+    init_eval(config_res, attack='FGSM', epsilon=0.0)
 

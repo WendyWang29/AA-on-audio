@@ -132,10 +132,10 @@ def save_perturbed_spec(file, folder, spec, epsilon, attack):
     # check if the same file already exists. If yes remove the old one
     if os.path.exists(file_path):
         os.remove(file_path)
-        print(f'Removed existing file: {file_path}')
+        #print(f'Removed existing file: {file_path}')
 
     np.save(file_path, spec)
-    print(f'Saved the perturbed spec as: {file_path}')
+    #print(f'Saved the perturbed spec as: {file_path}')
 
 def evaluate_spec(spec, model, device):
     spec = spec_to_tensor(spec,device)
@@ -175,7 +175,7 @@ def FGSM_perturb(spec, model, epsilon, GT, device):
     return p_spec, phase
 
 
-def FGSM_perturb_batch(data_loader, model, epsilon, config, device, folder_audio):
+def FGSM_perturb_batch(data_loader, model, epsilon, config, device, folder_audio, folder_spec):
     print('FGSM attack starts...')
 
     df_eval = pd.read_csv(os.path.join('..', config["df_eval_path"]))
@@ -201,6 +201,11 @@ def FGSM_perturb_batch(data_loader, model, epsilon, config, device, folder_audio
         for i in range(perturbed_batch.shape[0]):
             # working on each row of the matrix of perturbed specs
             sliced_spec = perturbed_batch[i][:, :time_frames[i]]
+            save_perturbed_spec(file=file_eval[index[i]],
+                                folder=folder_spec,
+                                spec=sliced_spec,
+                                epsilon=epsilon,
+                                attack='FGSM')
 
             audio, _ = spectrogram_inversion_batch(config=config,
                                              index=index[i],
@@ -229,6 +234,17 @@ class Attack:
         # given the index retrieve the file path, the GT label and the spectrogram
         file, label, spec = retrieve_single_cached_spec(index=index,
                                                         config=self.config)
+
+        ########
+        feature_len = spec.shape[1]
+        network_input_shape = 28 * 3
+        if feature_len < network_input_shape:
+            num_repeats = int(network_input_shape / feature_len) + 1
+            spec = np.tile(spec, (1, num_repeats))
+        spec = spec[:, :network_input_shape]
+        ########
+
+
         # turn the single spec into a mini-batch to be fed to the model
         spec = get_mini_batch(spec, self.device)
         return spec, label, file
@@ -326,8 +342,16 @@ class FGSMAttack(Attack):
         os.makedirs(self.audio_folder, exist_ok=True)
         print(f'Saving the perturbed dataset in {self.audio_folder}')
 
+        # create folder in which I save the perturbed specs (if it does not already exist)
+        epsilon = str(self.epsilon).replace('.', 'dot')
+        spec_folder = f'FGSM_dataset_{epsilon}_specs'
+        self.current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.spec_folder = os.path.join(self.current_dir, 'FGSM_data', spec_folder)
+        os.makedirs(self.spec_folder, exist_ok=True)
+        print(f'Saving the perturbed dataset specs in {self.spec_folder}')
+
         # perform the attack on batches (given by the data loader)
-        FGSM_perturb_batch(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder)
+        FGSM_perturb_batch(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder, self.spec_folder)
 
 
 

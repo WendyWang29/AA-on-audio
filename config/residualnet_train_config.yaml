@@ -15,6 +15,7 @@ is_eval: False
 eval_part: 0
 
 cache_dir: 'data/features/'
+attack_cache_dir: 'attacks/FGSM_data/FGSM_dataset_0dot0_specs'
 mfcc_features: 'data/features/mfcc'
 spec_features: 'data/features/spec'
 
