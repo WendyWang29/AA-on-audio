@@ -22,7 +22,7 @@ if __name__ == '__main__':
     model.eval()
 
     # set the perturbation
-    epsilon = 0.4
+    epsilon = 0.6
 
     FGSM_attack = FGSMAttack(epsilon, config, model, device)
     FGSM_attack.attack_dataset(eval_csv=df_eval)
