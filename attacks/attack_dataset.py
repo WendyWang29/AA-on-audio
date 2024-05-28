@@ -6,7 +6,6 @@ from attacks_utils import load_spec_model, FGSMAttack
 
 
 
-
 if __name__ == '__main__':
     seed_everything(1234)
     set_gpu(-1)
@@ -23,7 +22,7 @@ if __name__ == '__main__':
     model.eval()
 
     # set the perturbation
-    epsilon = 0.8
+    epsilon = 0.4
 
     FGSM_attack = FGSMAttack(epsilon, config, model, device)
     FGSM_attack.attack_dataset(eval_csv=df_eval)
