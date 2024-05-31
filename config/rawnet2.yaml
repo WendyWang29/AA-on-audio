@@ -7,3 +7,21 @@ model:
   gru_node: 1024
   nb_gru_layer: 3
   nb_classes: 2
+
+features: 'waveform'
+num_epochs: 100
+batch_size: 32
+eval_batch_size: 32 #64
+lr: 1e-04
+
+model_path: ''
+save_trained_name: 'rawnet2_model_ASVSpoof2019.pth'
+model_folder: 'checkpoints/rawnet2_model'
+
+df_train_path: 'data/df_train.csv'
+df_dev_path: 'data/df_dev.csv'
+df_eval_path: 'data/df_eval_19.csv'
+
+early_stopping: 10
+
+model_path_spec: './checkpoints/rawnet2_model/model_waveform_100_32_1e-04/rawnet2_model_ASVSpoof2019.pth'
