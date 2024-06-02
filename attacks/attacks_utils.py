@@ -93,7 +93,7 @@ def spec_to_tensor(spec, device):
 
 def save_perturbed_audio(file, folder, audio, sr, epsilon, attack):
 
-    epsilon_str = str(epsilon).replace('.', 'dot')
+
 
     # ensure folder path exists
     os.makedirs(folder, exist_ok=True)
