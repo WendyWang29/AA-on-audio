@@ -134,3 +134,32 @@ class LoadTrainData_RawNet(Dataset):
         #assert X_win.shape == (64000,), f'Expected shape (64000,) but got {X_win.shape}'
 
         return X_win, y
+
+
+
+class LoadAttackData_RawNet(Dataset):
+    def __init__(self, list_IDs, labels, config):
+        self.list_IDs = list_IDs
+        self.labels = labels
+        self.win_len = 4
+        self.config = config
+
+    def __len__(self):
+        return len(self.list_IDs)
+
+    def __getitem__(self, index):
+        track = self.list_IDs[index]
+        y = self.labels[track]
+        X = get_waveform(wav_path=track, config=self.config)
+        feature_len = X.shape[0]
+        network_input_shape = 16000 * self.win_len
+        if feature_len < network_input_shape:
+            num_repeats = int(network_input_shape / feature_len) + 1
+            X = np.tile(X, num_repeats)
+            # feature_len = X.shape[1]
+
+        X_win = X[: network_input_shape]
+        X_win = Tensor(X_win)
+
+        return X_win, y, feature_len, index
+

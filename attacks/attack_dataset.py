@@ -1,5 +1,7 @@
 """
 FGSM adversarial attack on whole datasets
+using ResNet
+in attack_utils.py --> attack_dataset method --> change the flag model='ResNet'
 """
 from src.utils import *
 from attacks_utils import load_spec_model, FGSMAttack

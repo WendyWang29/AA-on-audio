@@ -24,7 +24,7 @@ def rawnet_eval(model, df_eval, save_path, config, device):
         print(f'save_path exists, removing it to create a new one')
         os.system(f'rm {save_path}')
 
-    feat_set = LoadEvalData_RawNet(list_IDs=file_eval, win_len=config['win_len'], config=config)
+    feat_set = LoadEvalData_RawNet(list_IDs=file_eval, config=config)
     feat_loader = DataLoader(feat_set, batch_size=config['eval_batch_size'], shuffle=False, num_workers=15)
     model.eval()
 
@@ -64,7 +64,7 @@ def init_eval(config, attack=None, epsilon=None):
     else:
         # no attack performed
         df_eval = pd.read_csv(config["df_eval_path"])
-        save_path = './eval/prob_resnet_eval.csv'
+        save_path = './eval/prob_rawnet_eval.csv'
         rawnet_eval(rawnet_model, df_eval, save_path, config, device)
 
 
@@ -77,4 +77,4 @@ if __name__ == '__main__':
     config_path = 'config/rawnet2.yaml'
     config = read_yaml(config_path)
 
-    init_eval(config, attack='FGSM', epsilon=0.2)
+    init_eval(config, attack='FGSM', epsilon=0.4)

@@ -153,5 +153,5 @@ if __name__ == '__main__':
     config_path = 'config/residualnet_train_config.yaml'
     config_res = read_yaml(config_path)
 
-    init_eval(config_res, attack='FGSM', epsilon=0.2)
+    init_eval(config_res, attack=None, epsilon=None)
 

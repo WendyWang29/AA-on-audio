@@ -254,8 +254,6 @@ class LoadAttackData_ResNet(Dataset):
 
 
 
-
-
 class LoadTrainData_ResNet(Dataset):
     def __init__(self, list_IDs, labels, win_len, config):
         """
