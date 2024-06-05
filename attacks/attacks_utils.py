@@ -92,8 +92,7 @@ def spec_to_tensor(spec, device):
 
 
 def save_perturbed_audio(file, folder, audio, sr, epsilon, attack):
-
-
+    epsilon_str = str(epsilon).replace('.', 'dot')
 
     # ensure folder path exists
     os.makedirs(folder, exist_ok=True)
@@ -231,8 +230,8 @@ def FGSM_perturb_batch_RawNet(data_loader, model, epsilon, config, device, folde
 
     L = nn.NLLLoss()
 
-    for batch_x, batch_y, time_frames, index in tqdm(data_loader, total=len(data_loader)):
-        #TODO time frames should be called 'time samples'
+    for batch_x, batch_y, time_samples, index in tqdm(data_loader, total=len(data_loader)):
+
         batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
         batch_x.requires_grad = True
@@ -249,7 +248,7 @@ def FGSM_perturb_batch_RawNet(data_loader, model, epsilon, config, device, folde
 
         for i in range(perturbed_batch.shape[0]):
             # working on each row of the matrix of perturbed audios
-            sliced_audio = perturbed_batch[i][:time_frames[i]]
+            sliced_audio = perturbed_batch[i][:time_samples[i]]
             save_perturbed_audio(file=file_eval[index[i]],
                                 folder=folder_audio,
                                 audio=sliced_audio,
@@ -258,6 +257,46 @@ def FGSM_perturb_batch_RawNet(data_loader, model, epsilon, config, device, folde
                                 attack='FGSM_RawNet')
 
 
+def PGD_perturb_batch_RawNet(data_loader, model, epsilon, config, device, folder_audio):
+    # https://github.com/Harry24k/PGD-pytorch/blob/master/PGD.ipynb
+    print('PGD attack using RawNet2 starts...')
+    df_eval = pd.read_csv(os.path.join('..', config["df_eval_path"]))
+    file_eval = list(df_eval['path'])
+    torch.backends.cudnn.enabled = False
+
+    L = nn.NLLLoss()
+    iters = 40
+
+    for batch_x, batch_y, time_samples, index in tqdm(data_loader, total=len(data_loader)):
+
+        batch_x = batch_x.to(device)
+        batch_y = batch_y.to(device)
+
+        for i in range(iters):
+            batch_x.requires_grad = True
+            out = model(batch_x)
+            model.zero_grad()
+            loss = L(out, batch_y)
+            loss.backward()
+            grad = batch_x.grad.data
+            alpha = epsilon/iters
+            perturbed_batch = batch_x + alpha * grad.sign()
+            eta = torch.clamp(perturbed_batch - batch_x, min=-epsilon, max=epsilon)
+            batch_x = torch.clamp(batch_x + eta, min=-1, max=1).detach_()
+
+        batch_x = batch_x.squeeze(0).detach()
+        batch_x = batch_x.cpu()
+        batch_x = batch_x.numpy()
+
+        for i in range(perturbed_batch.shape[0]):
+            # working on each row of the matrix of perturbed audios
+            sliced_audio = batch_x[i][:time_samples[i]]
+            save_perturbed_audio(file=file_eval[index[i]],
+                                folder=folder_audio,
+                                audio=sliced_audio,
+                                sr=16000,
+                                epsilon=epsilon,
+                                attack='PGD_RawNet')
 
 
 
@@ -303,7 +342,7 @@ class Attack:
         print(f'The model output for the perturbed audio is: {out_audio}')
         print(f'The perturbed audio is predicted as: {get_pred_class(out_audio)}. GT label is {label}')
 
-    def attack_dataset(self, eval_csv, model='RawNet'):
+    def attack_dataset(self, eval_csv, model='ResNet'):
         eval_labels = dict(zip(eval_csv['path'], eval_csv['label']))
         file_eval = list(eval_csv['path'])
 
@@ -411,14 +450,24 @@ class FGSMAttack(Attack):
 
         # create folder in which I save the perturbed audios (if it does not already exist)
         epsilon = str(self.epsilon).replace('.', 'dot')
-        audio_folder = f'FGSM_RawNet_dataset_{epsilon}'
+
+        # TODO choose one
+        #audio_folder = f'FGSM_RawNet_dataset_{epsilon}'
+        audio_folder = f'PGD_RawNet_dataset_{epsilon}'
+
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.audio_folder = os.path.join(self.current_dir, 'FGSM_data', audio_folder)
+
+        # TODO choose one
+        #self.audio_folder = os.path.join(self.current_dir, 'FGSM_data', audio_folder)
+        self.audio_folder = os.path.join(self.current_dir, 'PGD_data', audio_folder)
+
         os.makedirs(self.audio_folder, exist_ok=True)
         print(f'Saving the perturbed dataset in {self.audio_folder}')
 
+        # TODO choose one
         # perform the attack on batches (given by the data loader)
-        FGSM_perturb_batch_RawNet(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder)
+        #FGSM_perturb_batch_RawNet(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder)
+        PGD_perturb_batch_RawNet(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder)
 
 
 

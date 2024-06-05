@@ -28,7 +28,7 @@ if __name__ == '__main__':
     rawnet_model.eval()
 
     # set the perturbation
-    epsilon = 0.005
+    epsilon = 0.1
 
     FGSM_attack = FGSMAttack(epsilon, config, rawnet_model, device)
     FGSM_attack.attack_dataset_RawNet(eval_csv=df_eval)
