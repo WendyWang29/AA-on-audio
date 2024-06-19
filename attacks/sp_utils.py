@@ -43,7 +43,6 @@ def recover_mag_spec(power_spec):
     magnitude_spec = np.sqrt(power_spec_linear)
     return magnitude_spec
 
-
 """
 ##### SPSI algorithm #####
 for the details check the appendix below
@@ -136,7 +135,6 @@ def spsi(msgram, n_fft, hop_length):
 
     return y_out
 
-
 def griffin_lim(magnitude_spectrogram, n_fft, hop_length, init_phase, num_iterations=100):
     """
     Griffin-Lim phase reconstruction algorithm.
@@ -164,7 +162,6 @@ def griffin_lim(magnitude_spectrogram, n_fft, hop_length, init_phase, num_iterat
         phase = complex_spectrogram_new / np.maximum(1e-8, np.abs(complex_spectrogram_new))
 
     return audio_signal
-
 
 def spectrogram_inversion_batch(config, index, spec, phase_info=True):
     '''
@@ -196,7 +193,6 @@ def spectrogram_inversion_batch(config, index, spec, phase_info=True):
     return audio, phase
 
 
-
 def spectrogram_inversion(config, index, spec, phase_info=True, phase_to_use=None):
     '''
     Inversion of a spectrogram.
@@ -208,9 +204,8 @@ def spectrogram_inversion(config, index, spec, phase_info=True, phase_to_use=Non
     :param phase_info: flag (True or False)
     :param phase_to_use: phase info from an already converted audio
     :return: audio file (array)
-
-
     '''
+    spec_shape = spec.shape[1]
 
     # recover the magnitude spectrogram from the power spectrogram
     mag_spec = recover_mag_spec(spec)
@@ -223,7 +218,7 @@ def spectrogram_inversion(config, index, spec, phase_info=True, phase_to_use=Non
             # get the phase info from the original audio file
             X = retrieve_single_audio(config, index)
             phase = np.angle(librosa.stft(y=X, n_fft=2048, hop_length=512, center=False))
-
+            phase = phase[:, :spec_shape]
             # reconstruct the audio using magnitude and phase
             audio = librosa.istft(mag_spec * np.exp(1j*phase), n_fft=2048, hop_length=512)
 
@@ -243,3 +238,4 @@ def spectrogram_inversion(config, index, spec, phase_info=True, phase_to_use=Non
                             )
 
     return audio, phase
+

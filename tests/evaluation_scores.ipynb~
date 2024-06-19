@@ -56,12 +56,12 @@
    "metadata": {
     "collapsed": false,
     "ExecuteTime": {
-     "end_time": "2024-06-07T11:08:58.355737Z",
-     "start_time": "2024-06-07T11:08:58.350784Z"
+     "end_time": "2024-06-07T09:31:23.893174Z",
+     "start_time": "2024-06-07T09:31:23.887274Z"
     }
    },
    "id": "142b35be13b9255",
-   "execution_count": 74
+   "execution_count": 37
   },
   {
    "cell_type": "code",

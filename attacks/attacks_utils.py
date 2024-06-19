@@ -6,6 +6,7 @@ import os
 import pandas as pd
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
 import sys
 import librosa
 import logging
@@ -23,7 +24,37 @@ from src.resnet_features import compute_spectrum
 
 logging.getLogger('numba').setLevel(logging.WARNING)
 
+def plot_image(map):
+    if torch.is_tensor(map):
+        SS_map = map.clone()
+        SS_map = SS_map.squeeze(0).cpu()
+    else:
+        SS_map = map
 
+    plt.imshow(SS_map, cmap='viridis', interpolation='nearest')
+    plt.colorbar()  # Show color scale
+    plt.title('2D Array Visualization')
+    plt.xlabel('X-axis')
+    plt.ylabel('Y-axis')
+    plt.show()
+
+
+def plot_specs_SSA(perturbed, original):
+    sr = 16000
+
+    plt.figure(figsize=(10, 10))
+    plt.subplot(2, 1, 1)
+    librosa.display.specshow(original, x_axis='time', sr=sr, y_axis='linear')
+    plt.title(f'Original power spec', fontsize=8)
+    plt.colorbar(format='%+2.0f dB')
+    plt.subplot(2, 1, 2)
+    librosa.display.specshow(perturbed, x_axis='time', sr=sr, y_axis='linear')
+    plt.title(f'Perturbed power spec', fontsize=8)
+    plt.colorbar(format='%+2.0f dB')
+
+    plt.subplots_adjust(hspace=0.7)
+    plt.tight_layout()
+    plt.show()
 
 def load_spec_model(device, config):
     # TODO delete from tests or something
@@ -89,7 +120,8 @@ def spec_to_tensor(spec, device):
     X_p.requires_grad = True
     return X_p
 
-
+def clip_by_tensor(t, t_min, t_max):
+    return torch.clamp(t, t_min, t_max)
 
 def save_perturbed_audio(file, folder, audio, sr, epsilon, attack):
     epsilon_str = str(epsilon).replace('.', 'dot')
@@ -176,7 +208,7 @@ def FGSM_perturb(spec, model, epsilon, GT, device):
 
 
 #def FGSM_perturb_batch(data_loader, model, epsilon, config, device, folder_audio, folder_spec):
-def FGSM_perturb_batch(data_loader, model, epsilon, config, device, folder_audio):
+def FGSM_perturb_batch_ResNet(data_loader, model, epsilon, config, device, folder_audio):
     print('FGSM attack starts...')
 
     df_eval = pd.read_csv(os.path.join('..', config["df_eval_path"]))
@@ -257,15 +289,16 @@ def FGSM_perturb_batch_RawNet(data_loader, model, epsilon, config, device, folde
                                 attack='FGSM_RawNet')
 
 
-def PGD_perturb_batch_RawNet(data_loader, model, epsilon, config, device, folder_audio):
+def BIM_perturb_batch_RawNet(data_loader, model, epsilon, config, device, folder_audio):
     # https://github.com/Harry24k/PGD-pytorch/blob/master/PGD.ipynb
-    print('PGD attack using RawNet2 starts...')
+    print('BIM attack using RawNet2 starts...')
     df_eval = pd.read_csv(os.path.join('..', config["df_eval_path"]))
     file_eval = list(df_eval['path'])
     torch.backends.cudnn.enabled = False
 
     L = nn.NLLLoss()
-    iters = 40
+    iters = 100
+    alpha = 0.001 #step towards gradient
 
     for batch_x, batch_y, time_samples, index in tqdm(data_loader, total=len(data_loader)):
 
@@ -279,10 +312,10 @@ def PGD_perturb_batch_RawNet(data_loader, model, epsilon, config, device, folder
             loss = L(out, batch_y)
             loss.backward()
             grad = batch_x.grad.data
-            alpha = epsilon/iters
+
             perturbed_batch = batch_x + alpha * grad.sign()
             eta = torch.clamp(perturbed_batch - batch_x, min=-epsilon, max=epsilon)
-            batch_x = torch.clamp(batch_x + eta, min=-1, max=1).detach_()
+            batch_x = torch.clamp(batch_x + eta, min=-1.0, max=1.0).detach_()
 
         batch_x = batch_x.squeeze(0).detach()
         batch_x = batch_x.cpu()
@@ -296,7 +329,7 @@ def PGD_perturb_batch_RawNet(data_loader, model, epsilon, config, device, folder
                                 audio=sliced_audio,
                                 sr=16000,
                                 epsilon=epsilon,
-                                attack='PGD_RawNet')
+                                attack='BIM_RawNet')
 
 
 
@@ -304,170 +337,175 @@ def PGD_perturb_batch_RawNet(data_loader, model, epsilon, config, device, folder
 
 
 
-class Attack:
-    def __init__(self, config, model, device):
-        self.config = config
-        self.model = model
-        self.device = device
-
-    def attack_single(self, index):
-        # given the index retrieve the file path, the GT label and the spectrogram
-        file, label, spec = retrieve_single_cached_spec(index=index,
-                                                        config=self.config)
-
-        ########
-        feature_len = spec.shape[1]
-        network_input_shape = 28 * 3
-        if feature_len < network_input_shape:
-            num_repeats = int(network_input_shape / feature_len) + 1
-            spec = np.tile(spec, (1, num_repeats))
-        spec = spec[:, :network_input_shape]
-        ########
 
 
-        # turn the single spec into a mini-batch to be fed to the model
-        spec = get_mini_batch(spec, self.device)
-        return spec, label, file
-
-    def evaluate_single(self, label, perturbed_spec, audio_path, perturbed_audio):
-        # the perturbed spectrogram is directly classified (no audio conversion)
-        out_spec = evaluate_spec(perturbed_spec, self.model, self.device)
-        print(f'The model output for the perturbed spectrogram is: {out_spec}')
-        print(f'The perturbed spectrogram is predicted as: {get_pred_class(out_spec)}. GT label is {label}')
-
-        # from the perturbed audio we compute again the spectrogram
-        #perturbed_audio_spec = get_spectrogram_from_audio(audio_path)
-        spec = compute_spectrum(perturbed_audio)
-        out_audio = evaluate_spec(spec, self.model, self.device)
-        print(f'The model output for the perturbed audio is: {out_audio}')
-        print(f'The perturbed audio is predicted as: {get_pred_class(out_audio)}. GT label is {label}')
-
-    def attack_dataset(self, eval_csv, model='ResNet'):
-        eval_labels = dict(zip(eval_csv['path'], eval_csv['label']))
-        file_eval = list(eval_csv['path'])
-
-        # get the data loader and return the dataloader
-        if model == 'ResNet':
-            feat_set = LoadAttackData_ResNet(list_IDs=file_eval,
-                                             labels=eval_labels,
-                                             win_len=self.config['win_len'],
-                                             config=self.config)
-            feat_loader = DataLoader(feat_set,
-                                     batch_size=self.config['eval_batch_size'],
-                                     shuffle=False,
-                                     num_workers=15)
-            del feat_set, eval_labels
-        elif model == 'RawNet':
-            feat_set = LoadAttackData_RawNet(list_IDs=file_eval,
-                                             labels=eval_labels,
-                                             config=self.config)
-            feat_loader = DataLoader(feat_set,
-                                     batch_size=self.config['eval_batch_size'],
-                                     shuffle=False,
-                                     num_workers=15)
-            del feat_set, eval_labels
-
-        return feat_loader
 
 
-class FGSMAttack(Attack):
-    def __init__(self, epsilon, config, model, device):
-        super().__init__(config, model, device)
-        self.epsilon = epsilon
-
-    def attack_single(self, index, type_of_attack):
-        spec, label, file = super().attack_single(index)
-
-        if type_of_attack == 'FGSM':
-            spec_folder = 'p_specs'
-            audio_folder = 'p_audio'
-        else:
-            print('Invalid type of attack')
-            sys.exit(1)
-
-        # define the paths for saving the perturbed data
-        self.current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.folder_specs_FGSM = os.path.join(self.current_dir, 'FGSM_data', spec_folder)
-        self.folder_audio_FGSM = os.path.join(self.current_dir, 'FGSM_data', audio_folder)
-
-        """
-        'FGSM' = run the classic FGSM attack
-        """
-        if type_of_attack == 'FGSM':
-            perturbed_spec, phase = FGSM_perturb(spec, self.model, self.epsilon, label, self.device)
-        else:
-            print('No attack')
-
-
-        # retrieve the perturbed audio
-        perturbed_audio, _ = spectrogram_inversion(self.config,
-                                                index,
-                                                perturbed_spec,
-                                                phase_info=True,
-                                                phase_to_use=phase)
-
-        # save the files
-        save_perturbed_spec(file=file,
-                            folder=self.folder_specs_FGSM,
-                            spec=perturbed_spec,
-                            epsilon=self.epsilon,
-                            attack=type_of_attack)
-
-        save_perturbed_audio(file=file,
-                             folder=self.folder_audio_FGSM,
-                             audio=perturbed_audio,
-                             sr=16000,
-                             epsilon=self.epsilon,
-                             attack=type_of_attack)
-
-        self.evaluate_single(label, perturbed_spec, file, perturbed_audio)
-
-    def attack_dataset(self, eval_csv):
-        feat_loader = super().attack_dataset(eval_csv)
-
-        # create folder in which I save the perturbed audios (if it does not already exist)
-        epsilon = str(self.epsilon).replace('.', 'dot')
-        audio_folder = f'FGSM_dataset_{epsilon}'
-        self.current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.audio_folder = os.path.join(self.current_dir, 'FGSM_data', audio_folder)
-        os.makedirs(self.audio_folder, exist_ok=True)
-        print(f'Saving the perturbed dataset in {self.audio_folder}')
-
-        # create folder in which I save the perturbed specs (if it does not already exist)
-        # epsilon = str(self.epsilon).replace('.', 'dot')
-        # spec_folder = f'FGSM_dataset_{epsilon}_specs'
-        # self.current_dir = os.path.dirname(os.path.abspath(__file__))
-        # self.spec_folder = os.path.join(self.current_dir, 'FGSM_data', spec_folder)
-        # os.makedirs(self.spec_folder, exist_ok=True)
-        # print(f'Saving the perturbed dataset specs in {self.spec_folder}')
-
-        # perform the attack on batches (given by the data loader)
-        FGSM_perturb_batch(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder)
-        # FGSM_perturb_batch(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder, self.spec_folder)
-
-    def attack_dataset_RawNet(self, eval_csv):
-        feat_loader = super().attack_dataset(eval_csv)
-
-        # create folder in which I save the perturbed audios (if it does not already exist)
-        epsilon = str(self.epsilon).replace('.', 'dot')
-
-        # TODO choose one
-        #audio_folder = f'FGSM_RawNet_dataset_{epsilon}'
-        audio_folder = f'PGD_RawNet_dataset_{epsilon}'
-
-        self.current_dir = os.path.dirname(os.path.abspath(__file__))
-
-        # TODO choose one
-        #self.audio_folder = os.path.join(self.current_dir, 'FGSM_data', audio_folder)
-        self.audio_folder = os.path.join(self.current_dir, 'PGD_data', audio_folder)
-
-        os.makedirs(self.audio_folder, exist_ok=True)
-        print(f'Saving the perturbed dataset in {self.audio_folder}')
-
-        # TODO choose one
-        # perform the attack on batches (given by the data loader)
-        #FGSM_perturb_batch_RawNet(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder)
-        PGD_perturb_batch_RawNet(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder)
+# class Attack:
+#     def __init__(self, config, model, device):
+#         self.config = config
+#         self.model = model
+#         self.device = device
+#
+#     def attack_single(self, index, attack):
+#         # given the index retrieve the file path, the GT label and the spectrogram
+#         file, label, spec = retrieve_single_cached_spec(index=index,
+#                                                         config=self.config)
+#
+#         ########
+#         feature_len = spec.shape[1]
+#         network_input_shape = 28 * 3
+#         if feature_len < network_input_shape:
+#             num_repeats = int(network_input_shape / feature_len) + 1
+#             spec = np.tile(spec, (1, num_repeats))
+#         spec = spec[:, :network_input_shape]
+#         ########
+#
+#         # turn the single spec into a mini-batch to be fed to the model
+#         spec = get_mini_batch(spec, self.device)
+#         return spec, label, file
+#
+#
+#     def evaluate_single(self, label, perturbed_spec, audio_path, perturbed_audio):
+#         # the perturbed spectrogram is directly classified (no audio conversion)
+#         out_spec = evaluate_spec(perturbed_spec, self.model, self.device)
+#         print(f'The model output for the perturbed spectrogram is: {out_spec}')
+#         print(f'The perturbed spectrogram is predicted as: {get_pred_class(out_spec)}. GT label is {label}')
+#
+#         # from the perturbed audio we compute again the spectrogram
+#         #perturbed_audio_spec = get_spectrogram_from_audio(audio_path)
+#         spec = compute_spectrum(perturbed_audio)
+#         out_audio = evaluate_spec(spec, self.model, self.device)
+#         print(f'The model output for the perturbed audio is: {out_audio}')
+#         print(f'The perturbed audio is predicted as: {get_pred_class(out_audio)}. GT label is {label}')
+#
+#     def attack_dataset(self, eval_csv, model='RawNet'):
+#         eval_labels = dict(zip(eval_csv['path'], eval_csv['label']))
+#         file_eval = list(eval_csv['path'])
+#
+#         # get the data loader and return the dataloader
+#         if model == 'ResNet':
+#             feat_set = LoadAttackData_ResNet(list_IDs=file_eval,
+#                                              labels=eval_labels,
+#                                              win_len=self.config['win_len'],
+#                                              config=self.config)
+#             feat_loader = DataLoader(feat_set,
+#                                      batch_size=self.config['eval_batch_size'],
+#                                      shuffle=False,
+#                                      num_workers=15)
+#             del feat_set, eval_labels
+#         elif model == 'RawNet':
+#             feat_set = LoadAttackData_RawNet(list_IDs=file_eval,
+#                                              labels=eval_labels,
+#                                              config=self.config)
+#             feat_loader = DataLoader(feat_set,
+#                                      batch_size=self.config['eval_batch_size'],
+#                                      shuffle=False,
+#                                      num_workers=15)
+#             del feat_set, eval_labels
+#
+#         return feat_loader
+#
+#
+# class FGSMAttack(Attack):
+#     def __init__(self, epsilon, config, model, device):
+#         super().__init__(config, model, device)
+#         self.epsilon = epsilon
+#
+#     def attack_single(self, index, type_of_attack):
+#         spec, label, file = super().attack_single(index)
+#
+#         if type_of_attack == 'FGSM':
+#             spec_folder = 'p_specs'
+#             audio_folder = 'p_audio'
+#         else:
+#             print('Invalid type of attack')
+#             sys.exit(1)
+#
+#         # define the paths for saving the perturbed data
+#         self.current_dir = os.path.dirname(os.path.abspath(__file__))
+#         self.folder_specs_FGSM = os.path.join(self.current_dir, 'FGSM_data', spec_folder)
+#         self.folder_audio_FGSM = os.path.join(self.current_dir, 'FGSM_data', audio_folder)
+#
+#         """
+#         'FGSM' = run the classic FGSM attack
+#         """
+#         if type_of_attack == 'FGSM':
+#             perturbed_spec, phase = FGSM_perturb(spec, self.model, self.epsilon, label, self.device)
+#         else:
+#             print('No attack')
+#
+#
+#         # retrieve the perturbed audio
+#         perturbed_audio, _ = spectrogram_inversion(self.config,
+#                                                 index,
+#                                                 perturbed_spec,
+#                                                 phase_info=True,
+#                                                 phase_to_use=phase)
+#
+#         # save the files
+#         save_perturbed_spec(file=file,
+#                             folder=self.folder_specs_FGSM,
+#                             spec=perturbed_spec,
+#                             epsilon=self.epsilon,
+#                             attack=type_of_attack)
+#
+#         save_perturbed_audio(file=file,
+#                              folder=self.folder_audio_FGSM,
+#                              audio=perturbed_audio,
+#                              sr=16000,
+#                              epsilon=self.epsilon,
+#                              attack=type_of_attack)
+#
+#         self.evaluate_single(label, perturbed_spec, file, perturbed_audio)
+#
+#     def attack_dataset(self, eval_csv):
+#         feat_loader = super().attack_dataset(eval_csv)
+#
+#         # create folder in which I save the perturbed audios (if it does not already exist)
+#         epsilon = str(self.epsilon).replace('.', 'dot')
+#         audio_folder = f'FGSM_dataset_{epsilon}'
+#         self.current_dir = os.path.dirname(os.path.abspath(__file__))
+#         self.audio_folder = os.path.join(self.current_dir, 'FGSM_data', audio_folder)
+#         os.makedirs(self.audio_folder, exist_ok=True)
+#         print(f'Saving the perturbed dataset in {self.audio_folder}')
+#
+#         # create folder in which I save the perturbed specs (if it does not already exist)
+#         # epsilon = str(self.epsilon).replace('.', 'dot')
+#         # spec_folder = f'FGSM_dataset_{epsilon}_specs'
+#         # self.current_dir = os.path.dirname(os.path.abspath(__file__))
+#         # self.spec_folder = os.path.join(self.current_dir, 'FGSM_data', spec_folder)
+#         # os.makedirs(self.spec_folder, exist_ok=True)
+#         # print(f'Saving the perturbed dataset specs in {self.spec_folder}')
+#
+#         # perform the attack on batches (given by the data loader)
+#         FGSM_perturb_batch(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder)
+#         # FGSM_perturb_batch(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder, self.spec_folder)
+#
+#     def attack_dataset_RawNet(self, eval_csv):
+#
+#         feat_loader = super().attack_dataset(eval_csv)
+#
+#         # create folder in which I save the perturbed audios (if it does not already exist)
+#         epsilon = str(self.epsilon).replace('.', 'dot')
+#
+#         # TODO choose one
+#         #audio_folder = f'FGSM_RawNet_dataset_{epsilon}'
+#         audio_folder = f'BIM_RawNet_dataset_{epsilon}'
+#
+#         self.current_dir = os.path.dirname(os.path.abspath(__file__))
+#
+#         # TODO choose one
+#         #self.audio_folder = os.path.join(self.current_dir, 'FGSM_data', audio_folder)
+#         self.audio_folder = os.path.join(self.current_dir, 'BIM_data', audio_folder)
+#
+#         os.makedirs(self.audio_folder, exist_ok=True)
+#         print(f'Saving the perturbed dataset in {self.audio_folder}')
+#
+#         # TODO choose one
+#         # perform the attack on batches (given by the data loader)
+#         #FGSM_perturb_batch_RawNet(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder)
+#         BIM_perturb_batch_RawNet(feat_loader, self.model, self.epsilon, self.config, self.device, self.audio_folder)
 
 
 

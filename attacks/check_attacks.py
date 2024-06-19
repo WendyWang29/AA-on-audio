@@ -2,10 +2,11 @@ import csv
 import logging
 from src.utils import *
 import matplotlib.pyplot as plt
+from attacks_utils import get_mini_batch
 from src.resnet_features import compute_spectrum
 from src.resnet_model import SpectrogramModel
 from src.rawnet2_model import RawNet
-from src.rawnet_utils import get_waveform
+from src.rawnet_utils import get_waveform, create_mini_batch_RawNet
 from torch import Tensor
 import librosa
 import re
@@ -31,16 +32,16 @@ def load_RawNet2():
     model.eval()
     return model, config
 
-def create_mini_batch_RawNet(audio):
-    feature_len = audio.shape[0]
-    network_input_shape = 16000 * 4
-    if feature_len < network_input_shape:
-        num_repeats = int(network_input_shape / feature_len) + 1
-        audio = np.tile(audio, num_repeats)
-    X_win = audio[: network_input_shape]
-    X_win = np.expand_dims(X_win, axis=0)
-    X_win = Tensor(X_win)
-    return X_win # the mini batch, still on CPU
+# def create_mini_batch_RawNet(audio):
+#     feature_len = audio.shape[0]
+#     network_input_shape = 16000 * 4
+#     if feature_len < network_input_shape:
+#         num_repeats = int(network_input_shape / feature_len) + 1
+#         audio = np.tile(audio, num_repeats)
+#     X_win = audio[: network_input_shape]
+#     X_win = np.expand_dims(X_win, axis=0)
+#     X_win = Tensor(X_win)
+#     return X_win # the mini batch, still on CPU
 
 def extract_id(file_path):
     match = re.search(r'LA_E_(\d+)', file_path)
@@ -104,10 +105,27 @@ def check_audio_given_the_name(audio_name, model_to_use, epsilon, config):
     eval_path = os.path.join('..', config['df_eval_path'])
 
     if model_to_use == 'ResNet':
-        pass
+
+        path = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}', audio_name)
+        #path = os.path.join('SSA_data', f'SSA_ResNet_dataset_{epsilon_str}', audio_name)
+
+        audio = get_waveform(path, config)
+        spec = compute_spectrum(audio)
+        plot_specs(audio, audio_name)
+        spec_batch = get_mini_batch(spec, device).to(device)
+        out = model(spec_batch)
+        probabilities = torch.exp(out)
+        gt_label = get_GT(audio_name, eval_path)
+        print(f'File: {audio_name}\n'
+              f'The GT label is {gt_label}\n'
+              f'The predicted label is {get_predicted_label(probabilities)}')
+
     elif model_to_use == 'RawNet2':
+
         #path = os.path.join('FGSM_data', f'FGSM_RawNet_dataset_{epsilon_str}', audio_name)
-        path = os.path.join('PGD_data', f'PGD_RawNet_dataset_{epsilon_str}', audio_name)
+        #path = os.path.join('BIM_data', f'BIM_RawNet_dataset_{epsilon_str}', audio_name)
+        path = os.path.join('SSA_data', f'SSA_ResNet_dataset_{epsilon_str}', audio_name)
+
         audio = get_waveform(path, config)
         plot_specs(audio, audio_name)
         audio_batch = create_mini_batch_RawNet(audio).to(device)
@@ -129,16 +147,20 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     #______ THINGS TO SET ______#
-    # model_to_use = 'ResNet'
     model_to_use = 'RawNet2'
-    epsilon = 0.01
-    audio_name = 'PGD_RawNet_LA_E_2834763_0dot01.flac'
+    #model_to_use = 'ResNet'
+    epsilon = 3.0
+    audio_name = 'SSA_LA_E_2834763_3dot0.flac'
     #__________________________#
 
     if model_to_use == 'ResNet':
         model, config = load_ResNet()
     elif model_to_use == 'RawNet2':
         model, config = load_RawNet2()
+
+    print(f'Model being evaluated: {model_to_use}\n'
+          f'File name: {audio_name}\n'
+          f'Epsilon: {epsilon}')
 
     check_audio_given_the_name(audio_name=audio_name,
                                model_to_use=model_to_use,

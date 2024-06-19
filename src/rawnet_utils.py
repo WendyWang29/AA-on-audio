@@ -18,6 +18,16 @@ def get_waveform(wav_path, config):
         X = librosa.resample(X, fs_orig, fs)
     return X
 
+def create_mini_batch_RawNet(audio):
+    feature_len = audio.shape[0]
+    network_input_shape = 16000 * 4
+    if feature_len < network_input_shape:
+        num_repeats = int(network_input_shape / feature_len) + 1
+        audio = np.tile(audio, num_repeats)
+    X_win = audio[: network_input_shape]
+    X_win = np.expand_dims(X_win, axis=0)
+    X_win = Tensor(X_win)
+    return X_win # the mini batch, still on CPU
 
 def train_epoch_rawnet(data_loader, model, device):
     running_loss = 0

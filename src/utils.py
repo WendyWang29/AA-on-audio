@@ -23,7 +23,8 @@ def set_gpu(id=-1):
         os.environ["CUDA_VISIBLE_DEVICES"] = str(-1)
     else:
         # -1 for automatic choice
-        device = id if id != -1 else GPUtil.getFirstAvailable(order='memory')[0]
+        # default values: maxMemory = 0.5, maxLoad = 0.5
+        device = id if id != -1 else GPUtil.getFirstAvailable(order='memory', maxMemory=0.9, maxLoad=0.9)[0]
         try:
             name = GPUtil.getGPUs()[device].name
         except IndexError:
