@@ -106,8 +106,8 @@ def check_audio_given_the_name(audio_name, model_to_use, epsilon, config):
 
     if model_to_use == 'ResNet':
 
-        path = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}', audio_name)
-        #path = os.path.join('SSA_data', f'SSA_ResNet_dataset_{epsilon_str}', audio_name)
+        #path = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}', audio_name)
+        path = os.path.join('SSA_data', f'SSA_ResNet_dataset_{epsilon_str}', audio_name)
 
         audio = get_waveform(path, config)
         spec = compute_spectrum(audio)
@@ -149,8 +149,8 @@ if __name__ == '__main__':
     #______ THINGS TO SET ______#
     model_to_use = 'RawNet2'
     #model_to_use = 'ResNet'
-    epsilon = 3.0
-    audio_name = 'SSA_LA_E_2834763_3dot0.flac'
+    epsilon = 5.0
+    audio_name = 'SSA_LA_E_5849185_5dot0.flac'
     #__________________________#
 
     if model_to_use == 'ResNet':

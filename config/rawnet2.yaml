@@ -24,4 +24,4 @@ df_eval_path: 'data/df_eval_19.csv'
 
 early_stopping: 10
 
-model_path_spec: './checkpoints/rawnet2_model/model_waveform_100_32_1e-04/rawnet2_model_ASVSpoof2019.pth'
+model_path_spec: '../checkpoints/rawnet2_model/model_waveform_100_32_1e-04/rawnet2_model_ASVSpoof2019.pth'

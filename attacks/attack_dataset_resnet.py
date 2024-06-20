@@ -22,11 +22,19 @@ if __name__ == '__main__':
     """
 
     mode = 'dataset'
-    epsilon = 3.0
+    epsilon = 5.0
     index = None
 
-    '''
-    SSA attack
-    '''
     attack = ResNetAttack(device=device, mode=mode)
-    attack.SSA_IFGSM_ResNet(epsilon=epsilon, index=index)
+
+    '''
+    SSA attack (spectrum simulation attack)
+    '''
+    # attack.SSA_IFGSM_ResNet(epsilon=epsilon, index=index)
+
+    '''
+    FGSM attack
+    '''
+    attack.FGSM_ResNet(epsilon=epsilon)
+
+

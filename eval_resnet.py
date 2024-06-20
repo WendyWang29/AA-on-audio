@@ -21,10 +21,13 @@ import os
 def create_csv(attack, epsilon):
 
     epsilon_dot_notation = str(epsilon).replace('.', 'dot')
-    flac_directory = os.path.join('attacks', f'{attack}_data', f'{attack}_dataset_{epsilon_dot_notation}')
+    flac_directory = os.path.join('..', 'attacks', f'{attack}_data', f'{attack}_ResNet_dataset_{epsilon_dot_notation}')
+    #flac_directory = os.path.join('attacks', f'{attack}_data', f'{attack}_dataset_{epsilon_dot_notation}')
+    #flac_directory = os.path.join('..', 'attacks', f'{attack}_data', f'{attack}_dataset_{epsilon_dot_notation}')
 
     # specify full path in which csv file has to be saved
-    csv_location = os.path.join('eval', f'flac_{attack}_{epsilon_dot_notation}_specs.csv')
+    csv_location = os.path.join('..', 'eval', f'flac_{attack}_{epsilon_dot_notation}_specs.csv')
+    #csv_location = os.path.join('eval', f'flac_{attack}_{epsilon_dot_notation}_specs.csv')
     if os.path.exists(csv_location):
         os.remove(csv_location)
         print(f"Existing file '{csv_location}' has been removed.")

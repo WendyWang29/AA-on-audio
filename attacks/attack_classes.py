@@ -67,12 +67,12 @@ class ResNetAttack:
 
     def FGSM_ResNet(self, epsilon):
 
-        epsilon = str(epsilon).replace('.', 'dot')
+        epsilon_str = str(epsilon).replace('.', 'dot')
 
         if self.mode == 'single':
             pass
         elif self.mode == 'dataset':
-            audio_folder = f'FGSM_dataset_{epsilon}'
+            audio_folder = f'FGSM_dataset_{epsilon_str}'
             self.current_dir = os.path.dirname(os.path.abspath(__file__))
             self.audio_folder = os.path.join(self.current_dir, 'FGSM_data', audio_folder)
             os.makedirs(self.audio_folder, exist_ok=True)
