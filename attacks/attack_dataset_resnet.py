@@ -21,20 +21,20 @@ if __name__ == '__main__':
     index: index of the file referring to df_eval_19.csv
     """
 
-    mode = 'dataset'
-    epsilon = 5.0
-    index = None
+    mode = 'single'
+    epsilon = 30.0
+    index = 0
 
     attack = ResNetAttack(device=device, mode=mode)
 
     '''
-    SSA attack (spectrum simulation attack)
-    '''
-    # attack.SSA_IFGSM_ResNet(epsilon=epsilon, index=index)
-
-    '''
     FGSM attack
     '''
-    attack.FGSM_ResNet(epsilon=epsilon)
+    #attack.FGSM_ResNet(epsilon=epsilon)
+
+    '''
+    SSA attack (spectrum simulation attack)
+    '''
+    attack.SSA_IFGSM_ResNet(epsilon=epsilon, index=index)
 
 

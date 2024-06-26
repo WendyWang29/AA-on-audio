@@ -19,7 +19,7 @@ def load_ResNet():
     config_path = '../config/residualnet_train_config.yaml'
     config = read_yaml(config_path)
     model = SpectrogramModel().to(device)
-    model.load_state_dict(torch.load(os.path.join('..', config["model_path_spec"]), map_location=device))
+    model.load_state_dict(torch.load(os.path.join( config["model_path_spec"]), map_location=device))
     model.eval()
     return model, config
 
@@ -28,7 +28,7 @@ def load_RawNet2():
     config = read_yaml(config_path)
     model = RawNet(config['model'], device)
     model = model.to(device)
-    model.load_state_dict(torch.load(os.path.join('..', config['model_path_spec']), map_location=device))
+    model.load_state_dict(torch.load(os.path.join(config['model_path_spec']), map_location=device))
     model.eval()
     return model, config
 
@@ -108,6 +108,7 @@ def check_audio_given_the_name(audio_name, model_to_use, epsilon, config):
 
         #path = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}', audio_name)
         path = os.path.join('SSA_data', f'SSA_ResNet_dataset_{epsilon_str}', audio_name)
+        #path = os.path.join('FGSMS_data', f'FGSMS_RawNet_dataset_{epsilon_str}', audio_name)
 
         audio = get_waveform(path, config)
         spec = compute_spectrum(audio)
@@ -122,9 +123,11 @@ def check_audio_given_the_name(audio_name, model_to_use, epsilon, config):
 
     elif model_to_use == 'RawNet2':
 
-        #path = os.path.join('FGSM_data', f'FGSM_RawNet_dataset_{epsilon_str}', audio_name)
-        #path = os.path.join('BIM_data', f'BIM_RawNet_dataset_{epsilon_str}', audio_name)
-        path = os.path.join('SSA_data', f'SSA_ResNet_dataset_{epsilon_str}', audio_name)
+        #path = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}', audio_name)
+        path = os.path.join('BIM_data', f'BIM_RawNet_dataset_{epsilon_str}', audio_name)
+        #path = os.path.join('PGD_data', f'PGD_RawNet_dataset_{epsilon_str}', audio_name)
+        #path = os.path.join('SSA_data', f'SSA_ResNet_dataset_{epsilon_str}', audio_name)
+        #path = os.path.join('FGSMS_data', f'FGSMS_RawNet_dataset_{epsilon_str}', audio_name)
 
         audio = get_waveform(path, config)
         plot_specs(audio, audio_name)
@@ -149,8 +152,8 @@ if __name__ == '__main__':
     #______ THINGS TO SET ______#
     model_to_use = 'RawNet2'
     #model_to_use = 'ResNet'
-    epsilon = 5.0
-    audio_name = 'SSA_LA_E_5849185_5dot0.flac'
+    epsilon = 0.001
+    audio_name = 'BIM_RawNet_LA_E_2834763_0dot001.flac'
     #__________________________#
 
     if model_to_use == 'ResNet':

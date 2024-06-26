@@ -10,6 +10,7 @@ import math
 import scipy.signal.windows as windows
 from src.audio_utils import read_audio
 from src.resnet_features import compute_spectrum
+from src.rawnet_utils import create_mini_batch_RawNet
 
 def get_spectrogram_from_audio(audio_path):
     audio, fs = read_audio(audio_path,
@@ -162,7 +163,6 @@ def griffin_lim(magnitude_spectrogram, n_fft, hop_length, init_phase, num_iterat
         phase = complex_spectrogram_new / np.maximum(1e-8, np.abs(complex_spectrogram_new))
 
     return audio_signal
-
 def spectrogram_inversion_batch(config, index, spec, phase_info=True):
     '''
     https://dsp.stackexchange.com/questions/9877/reconstruction-of-audio-signal-from-spectrogram/13401#13401
@@ -192,7 +192,6 @@ def spectrogram_inversion_batch(config, index, spec, phase_info=True):
 
     return audio, phase
 
-
 def spectrogram_inversion(config, index, spec, phase_info=True, phase_to_use=None):
     '''
     Inversion of a spectrogram.
@@ -217,10 +216,18 @@ def spectrogram_inversion(config, index, spec, phase_info=True, phase_to_use=Non
         else:
             # get the phase info from the original audio file
             X = retrieve_single_audio(config, index)
+            spectrogram = compute_spectrum(X)
+            spec_shape_og = spectrogram.shape[1]
+
+            # comment this block for normal usage
+            batch = create_mini_batch_RawNet(X)
+            X = batch.numpy().squeeze()
+            #######################################
+
             phase = np.angle(librosa.stft(y=X, n_fft=2048, hop_length=512, center=False))
             phase = phase[:, :spec_shape]
             # reconstruct the audio using magnitude and phase
-            audio = librosa.istft(mag_spec * np.exp(1j*phase), n_fft=2048, hop_length=512)
+            audio = librosa.istft((mag_spec * np.exp(1j*phase))[:, :spec_shape_og], n_fft=2048, hop_length=512)
 
     else:
         # recover a first audio reconstruction from the SPSI

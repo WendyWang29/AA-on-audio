@@ -12,6 +12,7 @@ import librosa
 import logging
 import soundfile as sf
 import torch.nn as nn
+import torch.fft as fft
 from tqdm import tqdm
 from src.resnet_model import SpectrogramModel
 from torch.utils.data import DataLoader
@@ -21,6 +22,7 @@ from src.resnet_utils import get_features
 from src.audio_utils import read_audio
 from attacks.sp_utils import spectrogram_inversion_batch, spectrogram_inversion, get_spectrogram_from_audio
 from src.resnet_features import compute_spectrum
+
 
 logging.getLogger('numba').setLevel(logging.WARNING)
 
@@ -56,6 +58,25 @@ def plot_specs_SSA(perturbed, original):
     plt.tight_layout()
     plt.show()
 
+
+def lpf_att_filter(grad, cutoff_frequency, sample_rate, attenuation_factor):
+    # Perform FFT on the gradient
+    grad_fft = fft.fft(grad, dim=-1)
+    frequencies = fft.fftfreq(grad.size(-1), d=1 / sample_rate)
+
+    # Create a filter mask
+    mask = torch.ones_like(frequencies, device=grad.device).float()
+    mask[torch.abs(frequencies) > cutoff_frequency] = 0
+    mask[torch.abs(frequencies) <= cutoff_frequency] *= attenuation_factor
+
+    # Apply the mask to the FFT of the gradient
+    grad_fft_filtered = grad_fft * mask
+
+    # Perform inverse FFT to get the filtered gradient
+    grad_filtered = fft.ifft(grad_fft_filtered, dim=-1).real
+
+    return grad_filtered
+
 def load_spec_model(device, config):
     # TODO delete from tests or something
     """
@@ -65,7 +86,7 @@ def load_spec_model(device, config):
     :return: model
     """
     resnet_spec_model = SpectrogramModel().to(device)
-    resnet_spec_model.load_state_dict(torch.load(os.path.join('..', config["model_path_spec"]), map_location=device))
+    resnet_spec_model.load_state_dict(torch.load(os.path.join(config["model_path_spec"]), map_location=device))
     return resnet_spec_model
 
 
@@ -136,7 +157,7 @@ def save_perturbed_audio(file, folder, audio, sr, epsilon, attack):
     # check if the same file already exists. If yes remove the old one
     if os.path.exists(file_path):
         os.remove(file_path)
-        #print(f'Removed existing file: {file_path}')
+        print(f'Removed existing file: {file_path}')
 
     sf.write(file_path, audio, sr, format='FLAC')
     #print(f'Saved the perturbed audio as: {file_path}')

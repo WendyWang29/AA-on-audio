@@ -1,5 +1,7 @@
+import librosa.display
 import torch
 import os
+import matplotlib.pyplot as plt
 from src.utils import *
 from attacks_utils import load_spec_model, clip_by_tensor, plot_specs_SSA, plot_image
 from src.rawnet2_model import RawNet
@@ -8,10 +10,11 @@ from src.resnet_utils import LoadAttackData_ResNet, get_features
 from src.rawnet_utils import LoadAttackData_RawNet
 from attacks_utils import FGSM_perturb_batch_ResNet
 from src.rawnet_utils import get_waveform, create_mini_batch_RawNet
-from attacks_utils import save_perturbed_audio, get_mini_batch
+from attacks_utils import save_perturbed_audio, get_mini_batch, lpf_att_filter
 from dct import *
 from sp_utils import spectrogram_inversion, spectrogram_inversion_batch
 from tqdm import tqdm
+from src.resnet_features import compute_spectrum
 
 
 
@@ -61,7 +64,7 @@ class ResNetAttack:
             del feat_set, eval_labels
             self.dataset_loader = feat_loader
 
-        if mode != 'dataset' or mode != 'single':
+        if mode != 'dataset' and mode != 'single':
             print('Mode must be "dataset" or "single"')
 
 
@@ -256,31 +259,6 @@ class ResNetAttack:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 '''
 #########################################
 ################ RAWNET2 ################
@@ -298,7 +276,7 @@ class RawNetAttack:
         rawnet_model = RawNet(self.config['model'], device)
         rawnet_model = rawnet_model.to(device)
         rawnet_model.load_state_dict(
-            torch.load(os.path.join('..', self.config['model_path_spec']), map_location=device))
+            torch.load(os.path.join(self.config['model_path_spec']), map_location=device))
         rawnet_model.eval()
         self.model = rawnet_model
 
@@ -318,10 +296,149 @@ class RawNetAttack:
             del feat_set, eval_labels
             self.dataset_loader = feat_loader
 
-    def FGSM_RawNet(self, epsilon):
-        pass
+    def FGSMS_RawNet(self, epsilon, index=0):
+        # "FGSMS" = FGSM attack on Spectrograms using RawNet2
 
-    def BIM_RawNet(self, epsilon, alpha=0.001, iters=100, index=0):
+        epsilon_str = str(epsilon).replace('.', 'dot')
+        audio_folder = f'FGSMS_RawNet_dataset_{epsilon_str}'
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        audio_folder = os.path.join(current_dir, 'FGSMS_data', audio_folder)
+        os.makedirs(audio_folder, exist_ok=True)
+        print(f'Saving the perturbed audio in {audio_folder}')
+        print('FGSM-S on RawNet2 starts...')
+
+        if self.mode == 'single':
+            file_eval = list(self.eval['path'])
+            label_eval = list(self.eval['label'])
+
+            file = file_eval[index]
+            label = label_eval[index]
+            label = torch.tensor([label])
+            print(f'Attacking single file {file} with label {label}')
+
+            audio = get_waveform(wav_path=file, config=self.config)
+
+            # cuts/tiles to 64000 samples long
+            batch = create_mini_batch_RawNet(audio)
+            audio = batch.numpy().squeeze() #get the cut/tiled audio
+
+            torch.backends.cudnn.enabled = False
+            L = nn.NLLLoss()
+
+            batch = batch.to(self.device)
+            label = label.to(self.device)
+
+            batch.requires_grad = True
+            out = self.model(batch)
+            loss = L(out, label)
+            self.model.zero_grad()
+
+            loss.backward()
+            grad = batch.grad.data
+            grad = grad * 500
+
+            # compute the spectrogram from the waveform
+            spec_grad = compute_spectrum(grad.cpu().detach().numpy())[0]
+            spec = compute_spectrum(audio)
+
+            # perturb the spectrogram
+            p_spec = spec + epsilon * np.sign(spec_grad)
+            p_spec = spec + np.sign(spec_grad)
+
+
+            # return to the waveform with spectrogram inversion and original phase
+            p_audio, _ = spectrogram_inversion(config=self.config,
+                                               index=index,
+                                               spec=p_spec,
+                                               phase_info=True)
+            save_perturbed_audio(file=file_eval[index],
+                                 folder=audio_folder,
+                                 audio=p_audio,
+                                 sr=16000,
+                                 epsilon=epsilon,
+                                 attack='FGSMS_RawNet')
+            print('ohoh')
+
+
+        elif self.mode == 'dataset':
+            pass
+
+
+    def PGD_RawNet(self, epsilon, alpha=0.001, iters=100, index=0):
+        epsilon_str = str(epsilon).replace('.', 'dot')
+        audio_folder = f'PGD_RawNet_dataset_{epsilon_str}'
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        audio_folder = os.path.join(current_dir, 'PGD_data', audio_folder)
+        os.makedirs(audio_folder, exist_ok=True)
+        print(f'Saving the perturbed audio in {audio_folder}')
+        print('PGD attack on RawNet starts...')
+
+        if self.mode == 'single':
+            file_eval = list(self.eval['path'])
+            label_eval = list(self.eval['label'])
+
+            file = file_eval[index]
+            label = label_eval[index]
+            label = torch.tensor([label])
+            print(f'Attacking single file {file} with label {label}')
+
+            audio = get_waveform(wav_path=file, config=self.config)
+            c_spec = compute_spectrum(audio)
+            length = len(audio)
+            batch = create_mini_batch_RawNet(audio)  # 64000 samples long
+
+            torch.backends.cudnn.enabled = False
+            L = nn.NLLLoss()
+
+            batch = batch.to(self.device)
+            label = label.to(self.device)
+
+            # Initialize perturbed_batch with a random perturbation within epsilon
+            p_batch = batch + torch.empty_like(batch).uniform_(-epsilon, epsilon)
+            p_batch = torch.clamp(p_batch, min=-1.0, max=1.0)
+
+            for i in range(iters):
+                p_batch.requires_grad = True
+                out = self.model(p_batch)
+
+                if out[0,0] > out[0,1]:
+                    pred_class = 0
+                else:
+                    pred_class = 1
+                if pred_class != label:
+                    print(f'Stopped at iteration number {i}')
+                    break
+
+                loss = L(out, label)
+                loss.backward()
+                grad = p_batch.grad.data
+
+                # update step
+                p_batch = p_batch + alpha * grad.sign()
+
+                # projection into epsilon ball
+                eta = torch.clamp(p_batch - batch, min=-epsilon, max=epsilon)
+                p_batch = torch.clamp(batch + eta, min=-1.0, max=1.0).detach_()
+
+            p_audio = p_batch.squeeze(0).detach().cpu().numpy()
+
+            sliced_audio = p_audio[:length]
+            p_spec = compute_spectrum(sliced_audio)
+
+            temp = p_spec - c_spec
+            librosa.display.specshow(temp, sr=16000, hop_length=512)
+            plt.show()
+
+            save_perturbed_audio(file=file_eval[index],
+                                 folder=audio_folder,
+                                 audio=p_audio,
+                                 sr=16000,
+                                 epsilon=epsilon,
+                                 attack='PGD_RawNet')
+            print(f'Audio file saved.')
+
+
+    def BIMc_RawNet(self, epsilon, alpha=0.001, iters=200, index=0):
 
         epsilon_str = str(epsilon).replace('.', 'dot')
         audio_folder = f'BIM_RawNet_dataset_{epsilon_str}'
@@ -353,24 +470,227 @@ class RawNetAttack:
             for i in range(iters):
                 batch.requires_grad = True
                 out = self.model(batch)
+
+                if out[0,0] > out[0,1]:
+                    pred_class = 0
+                else:
+                    pred_class = 1
+
+                if pred_class != label:
+                    print(f'Stopped at iteration number {i}')
+
+                    temp = grad.cpu().numpy()
+                    plt.figure()
+                    plt.plot(temp[0,:])
+                    plt.title('Grad waveform')
+                    plt.show()
+                    break
+
                 self.model.zero_grad()
                 loss = L(out, label)
                 loss.backward()
                 grad = batch.grad.data
 
+                # apply the LPF + attenuation
+                # sample_rate = 16000
+                # cutoff_frequency = 1000
+                # attenuation_factor = 1e-07
+                # grad_filtered = lpf_att_filter(grad, cutoff_frequency, sample_rate, attenuation_factor)
+
+                #perturbed_batch = batch + alpha * grad_filtered.sign()
+
+                grad[:, length:] = 0  #gradient can only be applied to tot samples
+
                 perturbed_batch = batch + alpha * grad.sign()
                 eta = torch.clamp(perturbed_batch - batch, min=-epsilon, max=epsilon)
                 batch = torch.clamp(batch + eta, min=-1.0, max=1.0).detach_()
 
-            batch = batch.squeeze(0).detach().cpu().numpy()
+                ###############
+                network_input_shape = 16000 * 4
+                batch_t = batch.cpu().numpy()
+                if length < network_input_shape:
+                    num_repeats = int(network_input_shape / length) + 1
+                    t = np.tile(batch_t, num_repeats)
+                batch_t = batch_t[: network_input_shape]
+                batch = torch.from_numpy(batch_t).to(self.device)
+                ##################
 
-            sliced_audio = batch[:length]
+            p_audio = batch.squeeze(0).detach().cpu().numpy()
+            sliced_audio = p_audio[:length]
+
             save_perturbed_audio(file=file_eval[index],
                                 folder=audio_folder,
                                 audio=sliced_audio,
                                 sr=16000,
                                 epsilon=epsilon,
                                 attack='BIM_RawNet')
+
+
+
+            print(f'Audio file saved.')
+
+            #check
+            p_spec = compute_spectrum(p_audio)
+            audio_name = 'BIM_RawNet_LA_E_2834763_0dot001.flac'
+            path = os.path.join('BIM_data', f'BIM_RawNet_dataset_{epsilon_str}', audio_name)
+            audio = get_waveform(path, self.config)
+            audio_batch = create_mini_batch_RawNet(audio)
+            audio_batch = audio_batch.squeeze(0).numpy()
+            new_spec = compute_spectrum(audio_batch)
+            temp2 = p_spec - new_spec
+
+            librosa.display.specshow(temp2, sr=16000, hop_length=512, x_axis='time', y_axis='linear')
+            plt.title('Attack phase 4s audio - reconstructed 4s audio')
+            plt.colorbar(format='%+2.0f dB')
+            plt.show()
+
+
+
+
+        elif self.mode == 'dataset':
+            pass
+
+    def BIM_RawNet(self, epsilon, alpha=0.001, iters=100, index=0):
+
+        epsilon_str = str(epsilon).replace('.', 'dot')
+        audio_folder = f'BIM_RawNet_dataset_{epsilon_str}'
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        audio_folder = os.path.join(current_dir, 'BIM_data', audio_folder)
+        os.makedirs(audio_folder, exist_ok=True)
+        print(f'Saving the perturbed audio in {audio_folder}')
+        print('BIM attack on RawNet starts...')
+
+        if self.mode == 'single':
+            file_eval = list(self.eval['path'])
+            label_eval = list(self.eval['label'])
+
+            file = file_eval[index]
+            label = label_eval[index]
+            label = torch.tensor([label])
+            print(f'Attacking single file {file} with label {label}')
+
+            audio = get_waveform(wav_path=file, config=self.config)
+            ########
+            # n = len(audio)
+            # audio_fft = np.fft.fft(audio)
+            # audio_fft = audio_fft[:n // 2]  # Take the positive frequencies
+            #
+            # # Step 3: Calculate the frequencies
+            # frequencies = np.fft.fftfreq(n, d=1 / 16000)
+            # frequencies = frequencies[:n // 2]  # Take the positive frequencies
+            #
+            # # Step 4: Plot the FFT
+            # plt.figure(figsize=(12, 6))
+            # plt.plot(frequencies, np.abs(audio_fft) / n)
+            # plt.title(f'FFT of {file}')
+            # plt.xlabel('Frequency (Hz)')
+            # plt.ylabel('Amplitude')
+            # plt.grid()
+            # plt.show()
+            # ##########
+
+            c_spec = compute_spectrum(audio)
+            length = len(audio)
+            batch = create_mini_batch_RawNet(audio) # 64000 samples long
+
+            torch.backends.cudnn.enabled = False
+            L = nn.NLLLoss()
+
+            batch = batch.to(self.device)
+            label = label.to(self.device)
+
+            for i in range(iters):
+                batch.requires_grad = True
+                out = self.model(batch)
+
+                if out[0,0] > out[0,1]:
+                    pred_class = 0
+                else:
+                    pred_class = 1
+                if pred_class != label:
+                    print(f'Stopped at iteration number {i}')
+                    #temp = grad_filtered.squeeze().cpu()
+
+                    ########
+                    # n = len(temp)
+                    # p_audio_fft = np.fft.fft(temp)
+                    # p_audio_fft = p_audio_fft[:n // 2]  # Take the positive frequencies
+                    #
+                    # # Step 3: Calculate the frequencies
+                    # frequencies = np.fft.fftfreq(n, d=1 / 16000)
+                    # frequencies = frequencies[:n // 2]  # Take the positive frequencies
+                    #
+                    # # Step 4: Plot the FFT
+                    # plt.figure(figsize=(12, 6))
+                    # plt.plot(frequencies, np.abs(p_audio_fft) / n)
+                    # plt.title(f'FFT of grad_filtered')
+                    # plt.xlabel('Frequency (Hz)')
+                    # plt.ylabel('Amplitude')
+                    # plt.xlim(0, 4000)
+                    # plt.grid()
+                    # plt.show()
+                    ##########
+
+                    break
+
+                self.model.zero_grad()
+                loss = L(out, label)
+                loss.backward()
+                grad = batch.grad.data
+
+                # apply the LPF + attenuation
+                sample_rate = 16000
+                cutoff_frequency = 1000
+                attenuation_factor = 1e-07
+                grad_filtered = lpf_att_filter(grad, cutoff_frequency, sample_rate, attenuation_factor)
+
+                perturbed_batch = batch + alpha * grad_filtered.sign()
+                #perturbed_batch = batch + alpha * grad.sign()
+                eta = torch.clamp(perturbed_batch - batch, min=-epsilon, max=epsilon)
+                batch = torch.clamp(batch + eta, min=-1.0, max=1.0).detach_()
+
+            p_audio = batch.squeeze(0).detach().cpu().numpy()
+
+            sliced_audio = p_audio[:length]
+            #p_spec = compute_spectrum(sliced_audio)
+            #p_spec = compute_spectrum(p_audio)
+
+
+
+            # temp = p_spec-c_spec
+            # librosa.display.specshow(temp, sr=16000, hop_length=512, x_axis='time', y_axis='linear')
+            # plt.title('Perturbed spec - clean spec')
+            # plt.colorbar(format='%+2.0f dB')
+            # plt.show()
+
+            save_perturbed_audio(file=file_eval[index],
+                                folder=audio_folder,
+                                audio=p_audio,
+                                sr=16000,
+                                epsilon=epsilon,
+                                attack='BIM_RawNet')
+
+
+            # check
+            # audio_name = 'BIM_RawNet_LA_E_2834763_0dot001.flac'
+            # path = os.path.join('BIM_data', f'BIM_RawNet_dataset_{epsilon_str}', audio_name)
+            # audio = get_waveform(path, self.config)
+            # audio_batch = create_mini_batch_RawNet(audio)
+            # audio_batch = audio_batch.squeeze(0).numpy()
+            # new_spec = compute_spectrum(audio_batch)
+            # temp2 = p_spec - new_spec
+            #
+            # librosa.display.specshow(temp2, sr=16000, hop_length=512, x_axis='time', y_axis='linear')
+            # plt.title('Attack phase 4s audio - reconstructed 4s audio')
+            # plt.colorbar(format='%+2.0f dB')
+            # plt.show()
+
+
+
+            print(f'Audio file saved.')
+
+
+
 
         elif self.mode == 'dataset':
             pass

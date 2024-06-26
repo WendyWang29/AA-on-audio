@@ -6,11 +6,13 @@ options:
 """
 from src.utils import *
 from attack_classes import RawNetAttack
-
+import logging
 
 
 
 if __name__ == '__main__':
+    logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
+
     seed_everything(1234)
     set_gpu(-1)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -22,11 +24,11 @@ if __name__ == '__main__':
     """
 
     mode = 'single'
-    epsilon = 0.2
-    index = 5
+    epsilon = 0.001
+    index = 0
 
     attack = RawNetAttack(device=device, mode=mode)
-    attack.BIM_RawNet(epsilon=epsilon, index=index)
+    attack.BIMc_RawNet(epsilon=epsilon, index=index)
 
 
 
