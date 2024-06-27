@@ -107,7 +107,8 @@ def check_audio_given_the_name(audio_name, model_to_use, epsilon, config):
     if model_to_use == 'ResNet':
 
         #path = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}', audio_name)
-        path = os.path.join('SSA_data', f'SSA_ResNet_dataset_{epsilon_str}', audio_name)
+        path = os.path.join('BIM_data', f'BIM_RawNet_dataset_{epsilon_str}', audio_name)
+        #path = os.path.join('SSA_data', f'SSA_ResNet_dataset_{epsilon_str}', audio_name)
         #path = os.path.join('FGSMS_data', f'FGSMS_RawNet_dataset_{epsilon_str}', audio_name)
 
         audio = get_waveform(path, config)

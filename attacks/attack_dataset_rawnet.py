@@ -31,11 +31,6 @@ if __name__ == '__main__':
     attack.BIMc_RawNet(epsilon=epsilon, index=index)
 
 
-
-
-
-
-
     # config_path = '../config/rawnet2.yaml'
     # config = read_yaml(config_path)
     #

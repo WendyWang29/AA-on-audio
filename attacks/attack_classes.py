@@ -2,6 +2,7 @@ import librosa.display
 import torch
 import os
 import matplotlib.pyplot as plt
+from torch import tensor
 from src.utils import *
 from attacks_utils import load_spec_model, clip_by_tensor, plot_specs_SSA, plot_image
 from src.rawnet2_model import RawNet
@@ -10,7 +11,7 @@ from src.resnet_utils import LoadAttackData_ResNet, get_features
 from src.rawnet_utils import LoadAttackData_RawNet
 from attacks_utils import FGSM_perturb_batch_ResNet
 from src.rawnet_utils import get_waveform, create_mini_batch_RawNet
-from attacks_utils import save_perturbed_audio, get_mini_batch, lpf_att_filter
+from attacks_utils import save_perturbed_audio, get_mini_batch, bpf_att_filter
 from dct import *
 from sp_utils import spectrogram_inversion, spectrogram_inversion_batch
 from tqdm import tqdm
@@ -438,7 +439,7 @@ class RawNetAttack:
             print(f'Audio file saved.')
 
 
-    def BIMc_RawNet(self, epsilon, alpha=0.001, iters=200, index=0):
+    def BIMc_RawNet(self, epsilon, alpha=0.001, iters=300, index=0):
 
         epsilon_str = str(epsilon).replace('.', 'dot')
         audio_folder = f'BIM_RawNet_dataset_{epsilon_str}'
@@ -457,7 +458,9 @@ class RawNetAttack:
             label = torch.tensor([label])
             print(f'Attacking single file {file} with label {label}')
 
+            # load the original audio waveform and create the input batch for rawnet
             audio = get_waveform(wav_path=file, config=self.config)
+            c_spec = compute_spectrum(audio)
             length = len(audio)
             batch = create_mini_batch_RawNet(audio) # 64000 samples long
 
@@ -467,10 +470,12 @@ class RawNetAttack:
             batch = batch.to(self.device)
             label = label.to(self.device)
 
+            # BIM attack starts here...
             for i in range(iters):
                 batch.requires_grad = True
                 out = self.model(batch)
 
+                # early stopping condition
                 if out[0,0] > out[0,1]:
                     pred_class = 0
                 else:
@@ -479,44 +484,111 @@ class RawNetAttack:
                 if pred_class != label:
                     print(f'Stopped at iteration number {i}')
 
-                    temp = grad.cpu().numpy()
-                    plt.figure()
-                    plt.plot(temp[0,:])
-                    plt.title('Grad waveform')
+                    # plotting the final filtered gradient
+                    temp = grad.detach().cpu().numpy()
+                    temp = temp.squeeze(0)
+                    n = len(temp)
+                    p_audio_fft = np.fft.fft(temp)
+                    p_audio_fft = p_audio_fft[:n // 2]  # Take the positive frequencies
+
+                    # calculate the frequencies
+                    frequencies = np.fft.fftfreq(n, d=1 / 16000)
+                    frequencies = frequencies[:n // 2]  # Take the positive frequencies
+
+                    # plot the FFT
+                    plt.figure(figsize=(12, 6))
+                    plt.plot(frequencies, np.abs(p_audio_fft) / n)
+                    plt.title(f'FFT of filtered gradient')
+                    plt.xlabel('Frequency (Hz)')
+                    plt.ylabel('Amplitude')
+                    plt.xlim(0, 4000)
+                    plt.grid()
                     plt.show()
                     break
 
                 self.model.zero_grad()
                 loss = L(out, label)
                 loss.backward()
-                grad = batch.grad.data
+                grad = batch.grad
 
-                # apply the LPF + attenuation
-                # sample_rate = 16000
-                # cutoff_frequency = 1000
-                # attenuation_factor = 1e-07
-                # grad_filtered = lpf_att_filter(grad, cutoff_frequency, sample_rate, attenuation_factor)
+                # take only 'length' samples from batch and repeat it
+                network_input_shape = 16000 * 4
+                grad_temp = grad.cpu().numpy()
+                t = grad_temp[:, :length]
 
-                #perturbed_batch = batch + alpha * grad_filtered.sign()
+                if length < network_input_shape:
+                    num_repeats = int(network_input_shape / length) + 1
+                    t = np.tile(t, num_repeats)
 
-                grad[:, length:] = 0  #gradient can only be applied to tot samples
+                grad_t = t[:, :network_input_shape]
+                grad = torch.tensor(grad_t, device=self.device, requires_grad=True)
+                ##################
 
+                # apply the BPF + attenuation to the grad
+                sample_rate = 16000
+                lower_cutoff_frequency = 300
+                upper_cutoff_frequency = 3000
+                attenuation_factor = 0.01
+                grad = bpf_att_filter(grad, lower_cutoff_frequency, upper_cutoff_frequency, sample_rate,
+                                      attenuation_factor)
+
+
+                # temp = grad.detach().cpu().numpy()
+                # temp = temp.squeeze(0)
+                # n = len(temp)
+                # p_audio_fft = np.fft.fft(temp)
+                # p_audio_fft = p_audio_fft[:n // 2]  # Take the positive frequencies
+                #
+                # # calculate the frequencies
+                # frequencies = np.fft.fftfreq(n, d=1 / 16000)
+                # frequencies = frequencies[:n // 2]  # Take the positive frequencies
+                #
+                # # plot the FFT
+                # plt.figure(figsize=(12, 6))
+                # plt.plot(frequencies, np.abs(p_audio_fft) / n)
+                # plt.title(f'FFT of filtered gradient')
+                # plt.xlabel('Frequency (Hz)')
+                # plt.ylabel('Amplitude')
+                # plt.xlim(0, 4000)
+                # plt.grid()
+                # plt.show()
+
+                # perturb the audio signal
                 perturbed_batch = batch + alpha * grad.sign()
                 eta = torch.clamp(perturbed_batch - batch, min=-epsilon, max=epsilon)
                 batch = torch.clamp(batch + eta, min=-1.0, max=1.0).detach_()
 
-                ###############
-                network_input_shape = 16000 * 4
-                batch_t = batch.cpu().numpy()
-                if length < network_input_shape:
-                    num_repeats = int(network_input_shape / length) + 1
-                    t = np.tile(batch_t, num_repeats)
-                batch_t = batch_t[: network_input_shape]
-                batch = torch.from_numpy(batch_t).to(self.device)
-                ##################
-
+            # reconstruct the audio
             p_audio = batch.squeeze(0).detach().cpu().numpy()
             sliced_audio = p_audio[:length]
+
+            p_spec = compute_spectrum(sliced_audio)
+
+            temp = p_spec - c_spec
+            librosa.display.specshow(temp, sr=16000, hop_length=512, x_axis='time', y_axis='linear')
+            plt.title('Perturbed spec - clean spec')
+            plt.colorbar(format='%+2.0f dB')
+            plt.show()
+
+            # plotting the FFt of the difference between p audio and clean audio
+            temp = sliced_audio - audio
+            n = len(temp)
+            p_audio_fft = np.fft.fft(temp)
+            p_audio_fft = p_audio_fft[:n // 2]  # Take the positive frequencies
+
+            # calculate the frequencies
+            frequencies = np.fft.fftfreq(n, d=1 / 16000)
+            frequencies = frequencies[:n // 2]  # Take the positive frequencies
+
+            # plot the FFT
+            plt.figure(figsize=(12, 6))
+            plt.plot(frequencies, np.abs(p_audio_fft) / n)
+            plt.title(f'FFT of (perturbed audio - clean audio)')
+            plt.xlabel('Frequency (Hz)')
+            plt.ylabel('Amplitude')
+            plt.xlim(0, 4000)
+            plt.grid()
+            plt.show()
 
             save_perturbed_audio(file=file_eval[index],
                                 folder=audio_folder,
@@ -524,7 +596,6 @@ class RawNetAttack:
                                 sr=16000,
                                 epsilon=epsilon,
                                 attack='BIM_RawNet')
-
 
 
             print(f'Audio file saved.')

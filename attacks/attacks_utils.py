@@ -59,15 +59,16 @@ def plot_specs_SSA(perturbed, original):
     plt.show()
 
 
-def lpf_att_filter(grad, cutoff_frequency, sample_rate, attenuation_factor):
+def bpf_att_filter(grad, lower_cutoff_frequency, upper_cutoff_frequency, sample_rate, attenuation_factor):
     # Perform FFT on the gradient
     grad_fft = fft.fft(grad, dim=-1)
     frequencies = fft.fftfreq(grad.size(-1), d=1 / sample_rate)
 
     # Create a filter mask
     mask = torch.ones_like(frequencies, device=grad.device).float()
-    mask[torch.abs(frequencies) > cutoff_frequency] = 0
-    mask[torch.abs(frequencies) <= cutoff_frequency] *= attenuation_factor
+    mask[(torch.abs(frequencies) <= lower_cutoff_frequency)] = 0
+    mask[(torch.abs(frequencies) >= upper_cutoff_frequency)] = 0
+    mask *= attenuation_factor
 
     # Apply the mask to the FFT of the gradient
     grad_fft_filtered = grad_fft * mask
