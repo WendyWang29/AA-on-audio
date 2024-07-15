@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
 
-def get_waveform(wav_path, config):
+def get_waveform(wav_path, config=None):
     fs = 16000
     X, fs_orig = librosa.load(wav_path, sr=None, duration=240, mono=True)
     if fs_orig != fs:

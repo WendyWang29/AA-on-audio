@@ -106,15 +106,27 @@ def check_audio_given_the_name(audio_name, model_to_use, epsilon, config):
 
     if model_to_use == 'ResNet':
 
+        path = os.path.join('BIMCut_data', f'BIMCut_ResNet_dataset_{epsilon_str}', audio_name)
         #path = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}', audio_name)
-        path = os.path.join('BIM_data', f'BIM_RawNet_dataset_{epsilon_str}', audio_name)
+        #path = os.path.join('BIM_data', f'BIM_RawNet_dataset_{epsilon_str}', audio_name)
         #path = os.path.join('SSA_data', f'SSA_ResNet_dataset_{epsilon_str}', audio_name)
         #path = os.path.join('FGSMS_data', f'FGSMS_RawNet_dataset_{epsilon_str}', audio_name)
 
         audio = get_waveform(path, config)
+        # temp = int(len(audio)/2)
+        # audio = audio[:temp]
         spec = compute_spectrum(audio)
+
         plot_specs(audio, audio_name)
+
+        spec_length = spec.shape[1]
+        net_input_shape = 28 * 3
+        if spec_length < net_input_shape:
+            num_repeats = int(net_input_shape / spec_length) + 1
+            spec = np.tile(spec, (1, num_repeats))
+        spec = spec[:, :net_input_shape]
         spec_batch = get_mini_batch(spec, device).to(device)
+
         out = model(spec_batch)
         probabilities = torch.exp(out)
         gt_label = get_GT(audio_name, eval_path)
@@ -124,6 +136,7 @@ def check_audio_given_the_name(audio_name, model_to_use, epsilon, config):
 
     elif model_to_use == 'RawNet2':
 
+        #path = os.path.join('DeepFool_RawNet', f'DeepFool_RawNet_dataset', audio_name)
         #path = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}', audio_name)
         path = os.path.join('BIM_data', f'BIM_RawNet_dataset_{epsilon_str}', audio_name)
         #path = os.path.join('PGD_data', f'PGD_RawNet_dataset_{epsilon_str}', audio_name)
@@ -131,6 +144,8 @@ def check_audio_given_the_name(audio_name, model_to_use, epsilon, config):
         #path = os.path.join('FGSMS_data', f'FGSMS_RawNet_dataset_{epsilon_str}', audio_name)
 
         audio = get_waveform(path, config)
+        # temp = int(len(audio)/2)
+        # audio = audio[:temp]
         plot_specs(audio, audio_name)
         audio_batch = create_mini_batch_RawNet(audio).to(device)
         out = model(audio_batch)
@@ -153,8 +168,8 @@ if __name__ == '__main__':
     #______ THINGS TO SET ______#
     model_to_use = 'RawNet2'
     #model_to_use = 'ResNet'
-    epsilon = 0.001
-    audio_name = 'BIM_RawNet_LA_E_2834763_0dot001.flac'
+    epsilon = 1.0
+    audio_name = 'BIMCut_LA_E_2834763_1dot0.flac'
     #__________________________#
 
     if model_to_use == 'ResNet':

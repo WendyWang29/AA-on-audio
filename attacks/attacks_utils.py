@@ -12,6 +12,7 @@ import librosa
 import logging
 import soundfile as sf
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.fft as fft
 from tqdm import tqdm
 from src.resnet_model import SpectrogramModel
@@ -25,6 +26,9 @@ from src.resnet_features import compute_spectrum
 
 
 logging.getLogger('numba').setLevel(logging.WARNING)
+
+
+
 
 def plot_image(map):
     if torch.is_tensor(map):
@@ -40,6 +44,32 @@ def plot_image(map):
     plt.ylabel('Y-axis')
     plt.show()
 
+
+def plot_FFT(item, title):
+    if torch.is_tensor(item):
+        temp = item
+        temp = temp.detach().cpu().numpy()
+        temp = temp.squeeze(0)
+    else:
+        temp = item
+
+    n = len(temp)
+    p_audio_fft = np.fft.fft(temp)
+    p_audio_fft = p_audio_fft[:n // 2]  # Take the positive frequencies
+
+    # calculate the frequencies
+    frequencies = np.fft.fftfreq(n, d=1 / 16000)
+    frequencies = frequencies[:n // 2]  # Take the positive frequencies
+
+    # plot the FFT
+    plt.figure(figsize=(12, 6))
+    plt.plot(frequencies, np.abs(p_audio_fft) / n)
+    plt.title(title)
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Amplitude')
+    plt.xlim(0, 8000)
+    plt.grid()
+    plt.show()
 
 def plot_specs_SSA(perturbed, original):
     sr = 16000
@@ -57,6 +87,46 @@ def plot_specs_SSA(perturbed, original):
     plt.subplots_adjust(hspace=0.7)
     plt.tight_layout()
     plt.show()
+
+
+def FFT_perturb(grad, batch, epsilon, alpha):
+    grad_fft = fft.fft(grad)
+    batch_fft = fft.fft(batch)
+
+    grad_real = grad_fft.real
+    grad_imag = grad_fft.imag
+    batch_real = batch_fft.real
+    batch_imag = batch_fft.imag
+    max_batch_real = torch.max(batch_real)
+    min_batch_real = torch.min(batch_real)
+    max_batch_imag = torch.max(batch_imag)
+    min_batch_imag = torch.min(batch_imag)
+
+    p_batch_real = batch_real + alpha * grad_real.sign()
+    p_batch_imag = batch_imag + alpha * grad_imag.sign()
+
+    eta_real = torch.clamp(p_batch_real - batch_real, min=-epsilon, max=epsilon)
+    eta_imag = torch.clamp(p_batch_imag - batch_imag, min=-epsilon, max=epsilon)
+
+    p_batch_real = torch.clamp(p_batch_real + eta_real, min=min_batch_real, max=max_batch_real).detach_()
+    p_batch_imag = torch.clamp(p_batch_imag + eta_imag, min=min_batch_imag, max=max_batch_imag).detach_()
+
+    p_batch = p_batch_real + 1j * p_batch_imag
+    p_audio = fft.ifft(p_batch).real
+
+    return p_audio
+
+def apply_vad(audio_waveform, threshold=0.005):
+    # voice activity detection
+    non_silent = np.abs(audio_waveform) > threshold  # boolean array
+    return non_silent
+
+
+
+def adjust_grad(grad, non_silent_regions, factor=2.0):
+    adjusted_grad = grad.copy()
+    adjusted_grad[:, non_silent_regions] *= factor
+    return adjusted_grad
 
 
 def bpf_att_filter(grad, lower_cutoff_frequency, upper_cutoff_frequency, sample_rate, attenuation_factor):
@@ -145,7 +215,7 @@ def spec_to_tensor(spec, device):
 def clip_by_tensor(t, t_min, t_max):
     return torch.clamp(t, t_min, t_max)
 
-def save_perturbed_audio(file, folder, audio, sr, epsilon, attack):
+def save_perturbed_audio(file, folder, audio, sr, attack, epsilon=None):
     epsilon_str = str(epsilon).replace('.', 'dot')
 
     # ensure folder path exists
@@ -161,7 +231,7 @@ def save_perturbed_audio(file, folder, audio, sr, epsilon, attack):
         print(f'Removed existing file: {file_path}')
 
     sf.write(file_path, audio, sr, format='FLAC')
-    #print(f'Saved the perturbed audio as: {file_path}')
+    print(f'Saved the perturbed audio as: {file_path}')
 
 def save_perturbed_spec(file, folder, spec, epsilon, attack):
     '''

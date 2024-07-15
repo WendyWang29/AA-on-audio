@@ -22,19 +22,30 @@ if __name__ == '__main__':
     """
 
     mode = 'single'
-    epsilon = 30.0
-    index = 0
+    epsilon = 1.0
+    index = 1
 
     attack = ResNetAttack(device=device, mode=mode)
 
     '''
+    FGSM Cut Attack
+    a variation of the FGSM attack on ResNet on which the gradient gets cut and tiled
+    like the spectrogram which is used as input for the model
+    '''
+    attack.BIMCut_ResNet(epsilon, index)
+
+
+
+
+    '''
     FGSM attack
+    normal FGSM attack which I used for generating all the perturbed dataset
     '''
     #attack.FGSM_ResNet(epsilon=epsilon)
 
     '''
     SSA attack (spectrum simulation attack)
     '''
-    attack.SSA_IFGSM_ResNet(epsilon=epsilon, index=index)
+    #attack.SSA_IFGSM_ResNet(epsilon=epsilon, index=index)
 
 
