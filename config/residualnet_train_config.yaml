@@ -21,7 +21,7 @@ spec_features: 'data/features/spec'
 
 df_train_path: 'data/df_train.csv'
 df_dev_path: 'data/df_dev.csv'
-df_eval_path: 'data/smaller_dataset_6025.csv'   #'data/df_eval_19.csv' 'data/df_eval.csv'
+df_eval_path: 'data/df_eval_19.csv' #'data/df_eval.csv'
 df_aug_path: 'data/df_aug.csv'
 
 fsamp: 16000

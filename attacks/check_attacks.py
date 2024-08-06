@@ -106,7 +106,8 @@ def check_audio_given_the_name(audio_name, model_to_use, epsilon, config):
 
     if model_to_use == 'ResNet':
 
-        path = os.path.join('BIMCut_data', f'BIMCut_ResNet_dataset_{epsilon_str}', audio_name)
+        path = os.path.join('FGSMc_data', f'FGSMc_ResNet_dataset_{epsilon_str}', audio_name)
+        #path = os.path.join('BIMCut_data', f'BIMCut_ResNet_dataset_{epsilon_str}', audio_name)
         #path = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}', audio_name)
         #path = os.path.join('BIM_data', f'BIM_RawNet_dataset_{epsilon_str}', audio_name)
         #path = os.path.join('SSA_data', f'SSA_ResNet_dataset_{epsilon_str}', audio_name)
@@ -137,7 +138,7 @@ def check_audio_given_the_name(audio_name, model_to_use, epsilon, config):
     elif model_to_use == 'RawNet2':
 
         #path = os.path.join('DeepFool_RawNet', f'DeepFool_RawNet_dataset', audio_name)
-        #path = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}', audio_name)
+        #path = os.path.join('FGSM_RawNet_data', f'FGSM_RawNet_dataset_{epsilon_str}', audio_name)
         path = os.path.join('BIM_data', f'BIM_RawNet_dataset_{epsilon_str}', audio_name)
         #path = os.path.join('PGD_data', f'PGD_RawNet_dataset_{epsilon_str}', audio_name)
         #path = os.path.join('SSA_data', f'SSA_ResNet_dataset_{epsilon_str}', audio_name)
@@ -168,8 +169,8 @@ if __name__ == '__main__':
     #______ THINGS TO SET ______#
     model_to_use = 'RawNet2'
     #model_to_use = 'ResNet'
-    epsilon = 1.0
-    audio_name = 'BIMCut_LA_E_2834763_1dot0.flac'
+    epsilon = 0.005
+    audio_name = 'BIM_RawNet_LA_E_5849185_0dot005.flac'
     #__________________________#
 
     if model_to_use == 'ResNet':

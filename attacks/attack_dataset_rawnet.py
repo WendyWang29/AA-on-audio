@@ -24,11 +24,11 @@ if __name__ == '__main__':
     """
 
     mode = 'single'
-    epsilon = 0.0001
-    index = 0
+    epsilon = 0.005
+    index = 5
 
     attack = RawNetAttack(device=device, mode=mode)
-    attack.BIMc_RawNet(index=index, epsilon=epsilon)
+    attack.BIM_RawNet(index=index, epsilon=epsilon)
 
 
     # config_path = '../config/rawnet2.yaml'

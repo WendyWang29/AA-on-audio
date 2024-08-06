@@ -32,7 +32,7 @@ if __name__ == '__main__':
     a variation of the FGSM attack on ResNet on which the gradient gets cut and tiled
     like the spectrogram which is used as input for the model
     '''
-    attack.BIMCut_ResNet(epsilon, index)
+    #attack.BIMCut_ResNet(epsilon, index)
 
 
 
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     FGSM attack
     normal FGSM attack which I used for generating all the perturbed dataset
     '''
-    #attack.FGSM_ResNet(epsilon=epsilon)
+    attack.FGSM_ResNet_c(epsilon=epsilon, index=index)
 
     '''
     SSA attack (spectrum simulation attack)
