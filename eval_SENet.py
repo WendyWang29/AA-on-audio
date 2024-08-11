@@ -17,8 +17,60 @@ import re
 from sklearn import model_selection
 import os
 
-def SENet_eval(model, df_eval, save_path, config, device):
-    file_eval = list(df_eval['path'])
+def create_csv(attack, at_model, epsilon):
+    '''
+    Create a csv file with path to each flac file in attacked dataset
+    :param attack: attack used
+    :param at_model: model used to perform the attack
+    :param epsilon: epsilon value of the attack
+    :return: path to csv file
+    '''
+
+    epsilon_dot_notation = str(epsilon).replace('.', 'dot')
+
+    if attack == 'FGSM' and at_model == 'ResNet':
+        # path to the directory containing the perturbed flac files
+        flac_directory = os.path.join('attacks', f'{attack}_data', f'{attack}_dataset_{epsilon_dot_notation}')
+        # specify full path in which csv file has to be saved
+        csv_location = os.path.join('eval', f'flac_{attack}_{at_model}_{epsilon_dot_notation}.csv')
+    elif attack == 'FGSM' and at_model == 'SENet':
+        flac_directory = os.path.join('attacks', f'{attack}_{at_model}', f'{attack}_{at_model}_dataset_{epsilon_dot_notation}')
+        csv_location = os.path.join('eval', f'flac_{attack}_{at_model}_{epsilon_dot_notation}.csv')
+    else:
+        print('mmmh')
+
+
+    if os.path.exists(csv_location):
+        os.remove(csv_location)
+        print(f"Existing file '{csv_location}' has been removed.")
+
+        # create list of flac files
+    flac_files = [f for f in os.listdir(flac_directory) if f.endswith('.flac')]
+
+    # create and write the csv file
+    with open(csv_location, 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        # write the header
+        csvwriter.writerow(['path'])
+        # write the data rows
+        for index, filename in enumerate(flac_files):
+            csvwriter.writerow([os.path.join(flac_directory, filename)])
+
+    return csv_location
+
+def SENet_eval(model, save_path, config, device, attack, at_model, epsilon=None, df_eval=None):
+
+    if epsilon != None:
+        # create list of evaluation files from the attacked dataset
+        path_to_csv = create_csv(attack, at_model, epsilon)
+        df_eval = pd.read_csv(path_to_csv)
+        file_eval = list(df_eval['path'])
+        print('ohoh')
+    elif epsilon == None and df_eval != None:
+        file_eval = list(df_eval['path'])
+    else:
+        print('There is something wrong')
+
     if os.path.exists(save_path):
         print(f'save_path exists, removing it to create a new one')
         os.system(f'rm {save_path}')
@@ -50,25 +102,27 @@ def SENet_eval(model, df_eval, save_path, config, device):
         print('Scores saved to {}'.format(save_path))
 
 
-def init_eval(config):
+def init_eval(config, attack=None, at_model=None, epsilon=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     SENet_model = se_resnet34_custom(num_classes=2).to(device)
-
-    print('Model state dictionary parameters:\n')
-    for key, value in SENet_model.state_dict().items():
-        print(f'{key}: {value.shape}')
-
-    checkpoint = torch.load(config['model_path_spec'], map_location=device)
-    print('\nCheckpoint state dict:\n')
-    for key, value in checkpoint.items():
-        print(f'{key}: {value.shape}')
-
     SENet_model.load_state_dict(torch.load(config['model_path_spec'], map_location=device), strict=False)
-    df_eval = pd.read_csv(config['df_eval_path'])
-    save_path = './eval/prob_SENet_spec_eval.csv'
 
-    SENet_eval(SENet_model, df_eval, save_path, config, device)
+    if attack == 'FGSM':
+        # perform the evaluation on the dataset attacked with FGSM on ResNet and a certain epsilon value
+        epsilon_str = str(epsilon).replace('.', 'dot')
+        save_path = f'./eval/prob_SENet_{attack}_{at_model}_{epsilon_str}.csv'
+        SENet_eval(SENet_model, save_path, config, device, attack, at_model, epsilon, df_eval=None)
+
+    elif attack == None:
+        # perform the evaluation on the clean dataset ASVSpoof2019
+        df_eval = pd.read_csv(config['df_eval_path'])
+        save_path = './eval/prob_SENet_spec_eval.csv'
+        SENet_eval(SENet_model, save_path, config, device, epsilon=None, df_eval=df_eval)
+
+    else:
+        print('Attack should be <ResNet FGSM>, <SENet FGSM> or None')
+
 
 if __name__ == '__main__':
     seed_everything(1234)
@@ -77,4 +131,11 @@ if __name__ == '__main__':
     config_path = 'config/SENet.yaml'
     config_res = read_yaml(config_path)
 
-    init_eval(config_res)
+    '''
+    attack: 'ResNet_FGSM'
+    at_model: 'ResNet' (model used to perform the attack)
+    epsilon: values like 1.0, 2.0....
+    '''
+
+    #init_eval(config_res, attack=None, at_model=None, epsilon=None)
+    init_eval(config_res, attack='FGSM', at_model='SENet', epsilon=2.0)
