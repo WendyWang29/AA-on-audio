@@ -228,7 +228,7 @@ def save_perturbed_audio(file, folder, audio, sr, attack, epsilon=None):
     # check if the same file already exists. If yes remove the old one
     if os.path.exists(file_path):
         os.remove(file_path)
-        print(f'Removed existing file: {file_path}')
+        #print(f'Removed existing file: {file_path}')
 
     sf.write(file_path, audio, sr, format='FLAC')
     #print(f'Saved the perturbed audio as: {file_path}')

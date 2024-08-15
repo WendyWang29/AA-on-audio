@@ -1,6 +1,7 @@
 import sys
 from src.utils import *
 import csv
+import re
 import librosa
 from src.resnet_features import compute_spectrum
 from src.resnet_model import SpectrogramModel
@@ -94,7 +95,7 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
     Check one perturbed (attacked) audio
     :param eval_model: model on which we want to test the perturbed audio
     :param attack_model: model which had been used to craft the attack
-    :param attack: attack used (FGSM)
+    :param attack: attack used (FGSM or BIM)
     :param file_number: file identifying number
     :param epsilon: epsilon used
     :param device: device
@@ -129,8 +130,16 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
         folder = os.path.join('FGSM_SENet', f'FGSM_SENet_dataset_{epsilon_str}')
         pert_file = f'FGSM_SENet_LA_E_{file_number}_{epsilon_str}.flac'
         file_path = os.path.join(folder, pert_file)
+    elif attack == 'BIM' and attack_model == 'SENet':
+        folder = os.path.join('BIM_SENet', f'BIM_SENet_dataset_{epsilon_str}')
+        pert_file = f'BIM_SENet_LA_E_{file_number}_{epsilon_str}.flac'
+        file_path = os.path.join(folder, pert_file)
+    elif attack == 'BIM_CUT' and attack_model == 'SENet':
+        folder = os.path.join('BIM_CUT_SENet', f'BIM_CUT_SENet_dataset_{epsilon_str}')
+        pert_file = f'BIM_CUT_SENet_LA_E_{file_number}_{epsilon_str}.flac'
+        file_path = os.path.join(folder, pert_file)
     else:
-        print('Invalid combination, should be FGSM-ResNet or FGSM-SENet')
+        print('Invalid combination, should be FGSM-ResNet, FGSM-SENet, BIM-SENet or BIM-CUT_SENet')
         sys.exit(1)
 
     original_audio, _ = get_original_audio(file_number)
@@ -154,4 +163,42 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
     return perturbed_audio, original_audio, perturbed_spec, original_spec
 
 
+def extract_id(file_path):
+    match = re.search(r'LA_E_(\d+)', file_path)
+    if match:
+        return match.group(1)
+    return None
 
+
+def pred_probabilities(file2_path):
+    # read df_eval_19
+    file1_path = '../data/df_eval_19.csv'
+
+    file1_ids = []
+    with open(file1_path, 'r') as file1:
+        csv_reader = csv.reader(file1)
+        for row in csv_reader:
+            file_id = extract_id(row[1])
+            if file_id:
+                file1_ids.append(file_id)
+
+    # read second file and store data in a dictionary
+    file2_data = {}
+    with open(file2_path, 'r') as file2:
+        csv_reader = csv.reader(file2)
+        for row in csv_reader:
+            file_id = extract_id(row[0])
+            if file_id:
+                file2_data[file_id] = (float(row[1]), float(row[2]))
+
+    output_array = []
+    for file_id in file1_ids:
+        if file_id in file2_data:
+            col2, col3 = file2_data[file_id]
+            output_array.append(0 if col2 > col3 else 1)
+
+    return output_array
+
+# if __name__ == '__main__':
+#     file = '../eval/prob_SENet_FGSM_SENet_1dot0.csv'
+#     pred = pred_probabilities(file)

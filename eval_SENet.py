@@ -132,10 +132,10 @@ if __name__ == '__main__':
     config_res = read_yaml(config_path)
 
     '''
-    attack: 'ResNet_FGSM'
-    at_model: 'ResNet' (model used to perform the attack)
+    attack: 'FGSM'
+    at_model: 'ResNet', 'SENet' (model used to perform the attack)
     epsilon: values like 1.0, 2.0....
     '''
 
     #init_eval(config_res, attack=None, at_model=None, epsilon=None)
-    init_eval(config_res, attack='FGSM', at_model='SENet', epsilon=2.0)
+    init_eval(config_res, attack='FGSM', at_model='SENet', epsilon=3.0)
