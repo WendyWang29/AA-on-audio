@@ -138,8 +138,12 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
         folder = os.path.join('BIM_CUT_SENet', f'BIM_CUT_SENet_dataset_{epsilon_str}')
         pert_file = f'BIM_CUT_SENet_LA_E_{file_number}_{epsilon_str}.flac'
         file_path = os.path.join(folder, pert_file)
+    elif attack == 'FGSM' and attack_model == 'LCNN':
+        folder = os.path.join('FGSM_LCNN', f'FGSM_LCNN_dataset_{epsilon_str}')
+        pert_file = f'FGSM_LCNN_LA_E_{file_number}_{epsilon_str}.flac'
+        file_path = os.path.join(folder, pert_file)
     else:
-        print('Invalid combination, should be FGSM-ResNet, FGSM-SENet, BIM-SENet or BIM-CUT_SENet')
+        print('Invalid combination. It should be: \nFGSM-ResNet,\nFGSM-SENet,\nBIM-SENet,\nFGSM-LCNN, \nor BIM-CUT_SENet')
         sys.exit(1)
 
     original_audio, _ = get_original_audio(file_number)

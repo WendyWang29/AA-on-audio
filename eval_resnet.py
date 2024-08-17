@@ -120,7 +120,7 @@ def init_eval(config, attack=None, at_model=None, epsilon=None):
         ResNet_eval(resnet_model, save_path, config, device, epsilon=None, df_eval=df_eval)
 
     else:
-        print('Attack should be <ResNet FGSM>, <SENet FGSM> or None')
+        print('todo')
 
 
 if __name__ == '__main__':
@@ -131,10 +131,10 @@ if __name__ == '__main__':
     config_res = read_yaml(config_path)
 
     '''
-    attack: 'FGSM'
+    attack: 'FGSM' etc
     at_model: 'ResNet', 'SENet' (model used to perform the attack)
     epsilon: values like 1.0, 2.0....
     '''
 
     #init_eval(config_res, attack=None, at_model=None, epsilon=None)
-    init_eval(config_res, attack='FGSM', at_model='SENet', epsilon=1.0)
+    init_eval(config_res, attack='FGSM', at_model='ResNet', epsilon=0.0)

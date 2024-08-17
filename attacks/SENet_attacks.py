@@ -117,16 +117,16 @@ def BIM_CUT_SENet(epsilon, config, model, df_eval, device):
             # repetition of the grad for each spec
             net_in_shape = 84
             new_grad = torch.zeros_like(grad)
-            for i in range(grad.shape[0]):
-                spec = grad[i]
-                original_len = time_frames[i]
+            for n in range(grad.shape[0]):
+                spec = grad[n]
+                original_len = time_frames[n]
 
                 if original_len < net_in_shape:
                     repeated_spec = spec[:, :original_len].repeat(1, (net_in_shape//original_len)+1)
                     truncated = repeated_spec[:, :net_in_shape]
-                    new_grad[i] = truncated
+                    new_grad[n] = truncated
                 else:
-                    new_grad[i] = spec
+                    new_grad[n] = spec
 
             perturbed_batch = batch_x + alpha * new_grad.sign()
             clipped_batch = torch.clamp(perturbed_batch, batch_x - epsilon, batch_x + epsilon)
@@ -161,7 +161,7 @@ def BIM_CUT_SENet(epsilon, config, model, df_eval, device):
                                  attack='BIM_CUT_SENet')
 
         time_taken = time.time() - start_time
-        tqdm.write(f'Time taken: {time_taken} | Stopped at iter: {stop_iter}')
+        tqdm.write(f'Time taken: {time_taken} | Stopped at iter: {stop_iter} | effectiveness: {effectiveness*100:.2f}%')
 
 
 
