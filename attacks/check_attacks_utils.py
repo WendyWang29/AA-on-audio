@@ -87,6 +87,12 @@ def get_og_spec(original_audio):
     spec = spec[:, :net_input_shape]
     return spec
 
+def compute_confidence(out):
+    probs = torch.exp(out)
+    probs = probs / probs.sum()
+    confidence = probs.max().item()
+    confidence_perc = confidence * 100
+    return confidence_perc
 
 
 
@@ -126,25 +132,11 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
         folder = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}')
         pert_file = f'FGSM_LA_E_{file_number}_{epsilon_str}.flac'
         file_path = os.path.join(folder, pert_file)
-    elif attack == 'FGSM' and attack_model == 'SENet':
-        folder = os.path.join('FGSM_SENet', f'FGSM_SENet_dataset_{epsilon_str}')
-        pert_file = f'FGSM_SENet_LA_E_{file_number}_{epsilon_str}.flac'
-        file_path = os.path.join(folder, pert_file)
-    elif attack == 'BIM' and attack_model == 'SENet':
-        folder = os.path.join('BIM_SENet', f'BIM_SENet_dataset_{epsilon_str}')
-        pert_file = f'BIM_SENet_LA_E_{file_number}_{epsilon_str}.flac'
-        file_path = os.path.join(folder, pert_file)
-    elif attack == 'BIM_CUT' and attack_model == 'SENet':
-        folder = os.path.join('BIM_CUT_SENet', f'BIM_CUT_SENet_dataset_{epsilon_str}')
-        pert_file = f'BIM_CUT_SENet_LA_E_{file_number}_{epsilon_str}.flac'
-        file_path = os.path.join(folder, pert_file)
-    elif attack == 'FGSM' and attack_model == 'LCNN':
-        folder = os.path.join('FGSM_LCNN', f'FGSM_LCNN_dataset_{epsilon_str}')
-        pert_file = f'FGSM_LCNN_LA_E_{file_number}_{epsilon_str}.flac'
-        file_path = os.path.join(folder, pert_file)
     else:
-        print('Invalid combination. It should be: \nFGSM-ResNet,\nFGSM-SENet,\nBIM-SENet,\nFGSM-LCNN, \nor BIM-CUT_SENet')
-        sys.exit(1)
+        folder = os.path.join(f'{attack}_{attack_model}', f'{attack}_{attack_model}_dataset_{epsilon_str}')
+        pert_file = f'{attack}_{attack_model}_LA_E_{file_number}_{epsilon_str}.flac'
+        file_path = os.path.join(folder, pert_file)
+
 
     original_audio, _ = get_original_audio(file_number)
     original_spec = get_og_spec(original_audio)
@@ -160,7 +152,8 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
           f'--> Attack: {attack} on {attack_model}\n'
           f'--> Epsilon: {epsilon}\n'
           f'--> GT label: {GT_label}\n',
-          f'--> Predicted label: {predicted_label}, \n\n{out}\n')
+          f'--> Predicted label: {predicted_label}, \n{out}\n'
+          f'--> Confidence: {compute_confidence(out):.2f} %')
 
 
 

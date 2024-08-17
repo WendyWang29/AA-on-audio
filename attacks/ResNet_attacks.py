@@ -91,6 +91,6 @@ if __name__ == '__main__':
     model.eval()
     print('Model loaded\n')
 
-    epsilon = 0.0
+    epsilon = 3.0
 
     FGSM_ResNet(epsilon, config, model, df_eval, device)
