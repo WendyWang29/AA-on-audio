@@ -127,6 +127,11 @@ def init_eval(config, attack=None, at_model=None, epsilon=None):
         save_path = f'./eval/prob_LCNN_{attack}_{at_model}_{epsilon_str}.csv'
         LCNN_eval(LCNN_model, save_path, config, device, attack, at_model, epsilon, df_eval=None)
 
+    elif attack == 'FGSM_UNCUT' and at_model == 'LCNN':
+        epsilon_str = str(epsilon).replace('.', 'dot')
+        save_path = f'./eval/prob_LCNN_{attack}_{at_model}_{epsilon_str}.csv'
+        LCNN_eval(LCNN_model, save_path, config, device, attack, at_model, epsilon, df_eval=None)
+
     elif attack == None:
         # perform the evaluation on the clean dataset ASVSpoof2019
         df_eval = pd.read_csv(config['df_eval_path'])
@@ -153,4 +158,4 @@ if __name__ == '__main__':
     '''
     #init_eval(config_res, attack=None, at_model=None, epsilon=None)
     #init_eval(config_res, attack='FGSM', at_model='ResNet', epsilon=3.0)
-    init_eval(config_res, attack='FGSM', at_model='LCNN', epsilon=2.0)
+    init_eval(config_res, attack='FGSM_UNCUT', at_model='LCNN', epsilon=3.0)

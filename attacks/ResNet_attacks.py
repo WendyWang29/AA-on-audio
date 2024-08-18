@@ -1,10 +1,13 @@
 from src.utils import *
 import os
+import gc
 from src.resnet_model import SpectrogramModel
 from src.resnet_utils import LoadAttackData_ResNet
+from src.resnet_features import compute_spectrum
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn as nn
+import librosa
 import time
 from attacks.sp_utils import spectrogram_inversion_batch
 from attacks_utils import save_perturbed_audio
@@ -33,6 +36,109 @@ def prepare_dataloader(attack, epsilon, config, df_eval):
                              num_workers=15)
     del feat_set, labels_eval
     return data_loader, file_eval, audio_folder
+
+def BIM_CUT_ResNet(epsilon, config, model, df_eval, device):
+    '''
+    only grad cut, no smoothing
+    '''
+    attack = 'BIM_CUT'
+    data_loader, file_eval, audio_folder = prepare_dataloader(attack, epsilon, config, df_eval)
+    L = nn.NLLLoss()
+    print('The attack starts...\n')
+    alpha = epsilon/3
+    n_iter = 10
+
+    for batch_x, batch_y, time_frames, index in tqdm(data_loader, total=len(data_loader)):
+        start_time = time.time()
+
+        batch_x = batch_x.to(device)
+        batch_y = batch_y.to(device)
+        batch_x.requires_grad = True
+        for i in range(n_iter):
+            out = model(batch_x)
+            loss = L(out, batch_y)
+            model.zero_grad()
+            loss.backward()
+            grad = batch_x.grad.data
+
+            # repetition of the grad for each spec
+            net_in_shape = 84
+            new_grad = torch.zeros_like(grad)
+            for n in range(grad.shape[0]):
+                spec = grad[n]
+                original_len = time_frames[n]
+                cut_spec = spec[:, :original_len] # we are actually working on the grad...
+
+                if original_len < net_in_shape:
+                    # repeat the smoothed spec
+                    num_repeats = int(net_in_shape/original_len) + 1
+                    repeated_spec = torch.tile(cut_spec, (1, num_repeats))
+                    truncated = repeated_spec[:, :net_in_shape]
+                    new_grad[n] = truncated
+                else:
+                    new_grad[n] = spec
+
+            perturbed_batch = batch_x + alpha * new_grad.sign()
+            clipped_batch = torch.clamp(perturbed_batch, batch_x - epsilon, batch_x + epsilon)
+
+            # early stopping
+            predictions = model(clipped_batch)
+            predicted_labels = torch.argmax(predictions, dim=1)
+            wrong_predictions = (predicted_labels != batch_y)
+            effectiveness = wrong_predictions.float().mean()
+            effectiveness_percentage = effectiveness * 100
+
+            if effectiveness_percentage >= 80:
+                stop_iter = i
+                break
+
+            del grad, new_grad, loss, out, predictions, predicted_labels, wrong_predictions
+            torch.cuda.empty_cache()
+            gc.collect()
+
+        perturbed_batch = perturbed_batch.squeeze(0).detach()
+        perturbed_batch = perturbed_batch.cpu()
+        perturbed_batch = perturbed_batch.numpy()
+
+        for m in range(perturbed_batch.shape[0]):
+            # working on each row of the matrix of perturbed specs
+            sliced_spec = perturbed_batch[m][:, :time_frames[m]]
+
+            audio, _ = spectrogram_inversion_batch(config=config,
+                                                   index=index[m],
+                                                   spec=sliced_spec,
+                                                   phase_info=True)
+
+            save_perturbed_audio(file=file_eval[index[m]],
+                                 folder=audio_folder,
+                                 audio=audio,
+                                 sr=16000,
+                                 epsilon=epsilon,
+                                 attack='BIM_CUT_ResNet')
+
+            ###
+            # checks
+            ###
+            # audio_1 = audio
+            # spec_1 = compute_spectrum(audio_1)
+            # spec_0 = perturbed_batch[0]
+            # original_len = spec_1.shape[1]
+            # num_repeats = int(84/original_len)+1
+            # repeated_spec = np.tile(spec_1, (1, num_repeats))
+            # truncated = repeated_spec[:, :84]
+            # spec_1 = truncated
+            # temp = spec_0 - spec_1
+            # librosa.display.specshow(temp)
+            # plt.show()
+
+        # Free up memory by detaching tensors from the graph and deleting them
+        del batch_x, batch_y, perturbed_batch
+
+        time_taken = time.time() - start_time
+        tqdm.write(f'Time taken: {time_taken} | Stopped at iter: {stop_iter} | effectiveness: {effectiveness*100:.2f}% | alpha total: {alpha*(stop_iter+1)}')
+        torch.cuda.empty_cache()
+        gc.collect()
+
 
 
 def FGSM_ResNet(epsilon, config, model, df_eval, device):
@@ -91,6 +197,6 @@ if __name__ == '__main__':
     model.eval()
     print('Model loaded\n')
 
-    epsilon = 3.0
+    epsilon = 2.0
 
-    FGSM_ResNet(epsilon, config, model, df_eval, device)
+    BIM_CUT_ResNet(epsilon, config, model, df_eval, device)

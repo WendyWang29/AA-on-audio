@@ -151,18 +151,18 @@ def get_loss_resnet(data_loader, model, device):
     return running_loss
 
 
-def get_features_1(wav_path):
-    """
-    Modified get_features that takes FOR SURE the cached ATTACKED spectrograms
-    (not the clean cached spectrograms in data)
-    NB --> modify manually the epsilon values <--
-    :return: np_array
-    """
-    cache_dir = 'attacks/FGSM_data/FGSM_dataset_0dot0_specs'
-    file_name = f'FGSM_{os.path.splitext(os.path.basename(wav_path))[0]}_0dot0'
-    file_name = os.path.join(cache_dir, file_name + '.npy')
-    data = np.load(file_name, allow_pickle=True)
-    return data
+# def get_features_1(wav_path):
+#     """
+#     Modified get_features that takes FOR SURE the cached ATTACKED spectrograms
+#     (not the clean cached spectrograms in data)
+#     NB --> modify manually the epsilon values <--
+#     :return: np_array
+#     """
+#     cache_dir = 'attacks/FGSM_data/FGSM_dataset_0dot0_specs'
+#     file_name = f'FGSM_{os.path.splitext(os.path.basename(wav_path))[0]}_0dot0'
+#     file_name = os.path.join(cache_dir, file_name + '.npy')
+#     data = np.load(file_name, allow_pickle=True)
+#     return data
 
 
 def get_features(wav_path, features, args, X, cached=True, force=False):

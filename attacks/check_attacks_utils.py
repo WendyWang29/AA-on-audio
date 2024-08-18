@@ -111,7 +111,7 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
     string = eval_model
 
     # load the evaluation model
-    if eval_model == 'ResNet' and attack == 'FGSM':
+    if eval_model == 'ResNet':
         eval_model, config = load_resnet(device)
     elif eval_model == 'RawNet':
         pass
