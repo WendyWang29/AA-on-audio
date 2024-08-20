@@ -71,7 +71,6 @@ def LCNN_eval(model, save_path, config, device, attack, at_model, epsilon=None, 
         path_to_csv = create_csv(attack, at_model, epsilon)
         df_eval = pd.read_csv(path_to_csv)
         file_eval = list(df_eval['path'])
-        print('ohoh')
     elif epsilon == None and df_eval != None:
         file_eval = list(df_eval['path'])
     else:
@@ -80,6 +79,7 @@ def LCNN_eval(model, save_path, config, device, attack, at_model, epsilon=None, 
     if os.path.exists(save_path):
         print(f'save_path exists, removing it to create a new one')
         os.system(f'rm {save_path}')
+
     '''
     using the same data loaders of ResNet
     '''
@@ -116,30 +116,21 @@ def init_eval(config, attack=None, at_model=None, epsilon=None):
     LCNN_model = LCNN().to(device)
     LCNN_model.load_state_dict(torch.load(config['model_path_spec'], map_location=device), strict=False)
 
-    if attack == 'FGSM' and at_model == 'ResNet':
-        # perform the evaluation on the dataset attacked with FGSM on ResNet and a certain epsilon value
+    print("Number of layers:", len(list(LCNN_model.modules())))
+    total_params = sum(p.numel() for p in LCNN_model.parameters())
+    print("Total number of parameters:", total_params)
+
+    if attack:
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = f'./eval/prob_LCNN_{attack}_{at_model}_{epsilon_str}.csv'
         LCNN_eval(LCNN_model, save_path, config, device, attack, at_model, epsilon, df_eval=None)
 
-    elif attack == 'FGSM' and at_model == 'LCNN':
-        epsilon_str = str(epsilon).replace('.', 'dot')
-        save_path = f'./eval/prob_LCNN_{attack}_{at_model}_{epsilon_str}.csv'
-        LCNN_eval(LCNN_model, save_path, config, device, attack, at_model, epsilon, df_eval=None)
-
-    elif attack == 'FGSM_UNCUT' and at_model == 'LCNN':
-        epsilon_str = str(epsilon).replace('.', 'dot')
-        save_path = f'./eval/prob_LCNN_{attack}_{at_model}_{epsilon_str}.csv'
-        LCNN_eval(LCNN_model, save_path, config, device, attack, at_model, epsilon, df_eval=None)
-
-    elif attack == None:
+    else:
         # perform the evaluation on the clean dataset ASVSpoof2019
         df_eval = pd.read_csv(config['df_eval_path'])
         save_path = './eval/prob_LCNN_spec_eval.csv'
         LCNN_eval(LCNN_model, save_path, config, device, epsilon=None, df_eval=df_eval)
 
-    else:
-        print('TODO')
 
 
 
@@ -157,5 +148,4 @@ if __name__ == '__main__':
     epsilon: values like 1.0, 2.0....
     '''
     #init_eval(config_res, attack=None, at_model=None, epsilon=None)
-    #init_eval(config_res, attack='FGSM', at_model='ResNet', epsilon=3.0)
-    init_eval(config_res, attack='FGSM_UNCUT', at_model='LCNN', epsilon=3.0)
+    init_eval(config_res, attack='FGSM', at_model='ResNet', epsilon=2.0)

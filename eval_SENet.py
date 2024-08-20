@@ -33,11 +33,10 @@ def create_csv(attack, at_model, epsilon):
         flac_directory = os.path.join('attacks', f'{attack}_data', f'{attack}_dataset_{epsilon_dot_notation}')
         # specify full path in which csv file has to be saved
         csv_location = os.path.join('eval', f'flac_{attack}_{at_model}_{epsilon_dot_notation}.csv')
-    elif attack == 'FGSM' and at_model == 'SENet':
+    else:
         flac_directory = os.path.join('attacks', f'{attack}_{at_model}', f'{attack}_{at_model}_dataset_{epsilon_dot_notation}')
         csv_location = os.path.join('eval', f'flac_{attack}_{at_model}_{epsilon_dot_notation}.csv')
-    else:
-        print('mmmh')
+
 
 
     if os.path.exists(csv_location):
@@ -108,7 +107,11 @@ def init_eval(config, attack=None, at_model=None, epsilon=None):
     SENet_model = se_resnet34_custom(num_classes=2).to(device)
     SENet_model.load_state_dict(torch.load(config['model_path_spec'], map_location=device), strict=False)
 
-    if attack == 'FGSM':
+    print("Number of layers:", len(list(SENet_model.modules())))
+    total_params = sum(p.numel() for p in SENet_model.parameters())
+    print("Total number of parameters:", total_params)
+
+    if attack:
         # perform the evaluation on the dataset attacked with FGSM on ResNet and a certain epsilon value
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = f'./eval/prob_SENet_{attack}_{at_model}_{epsilon_str}.csv'
@@ -138,4 +141,4 @@ if __name__ == '__main__':
     '''
 
     #init_eval(config_res, attack=None, at_model=None, epsilon=None)
-    init_eval(config_res, attack='FGSM', at_model='SENet', epsilon=3.0)
+    init_eval(config_res, attack='FGSM', at_model='LCNN', epsilon=2.0)

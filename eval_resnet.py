@@ -29,17 +29,18 @@ def create_csv(attack, at_model, epsilon):
 
     epsilon_dot_notation = str(epsilon).replace('.', 'dot')
 
-    if attack == 'FGSM' and at_model == 'ResNet':
-        # path to the directory containing the perturbed flac files
-        flac_directory = os.path.join('attacks', f'{attack}_data', f'{attack}_dataset_{epsilon_dot_notation}')
-        # specify full path in which csv file has to be saved
-        csv_location = os.path.join('eval', f'flac_{attack}_{at_model}_{epsilon_dot_notation}.csv')
-    elif attack == 'FGSM' and at_model == 'SENet':
-        flac_directory = os.path.join('attacks', f'{attack}_{at_model}', f'{attack}_{at_model}_dataset_{epsilon_dot_notation}')
-        csv_location = os.path.join('eval', f'flac_{attack}_{at_model}_{epsilon_dot_notation}.csv')
-    else:
-        print('mmmh')
+    # if attack == 'FGSM' and at_model == 'ResNet':
+    #     # path to the directory containing the perturbed flac files
+    #     flac_directory = os.path.join('attacks', f'{attack}_data', f'{attack}_dataset_{epsilon_dot_notation}')
+    #     # specify full path in which csv file has to be saved
+    #     csv_location = os.path.join('eval', f'flac_{attack}_{at_model}_{epsilon_dot_notation}.csv')
+    # else:
+    #     flac_directory = os.path.join('attacks', f'{attack}_{at_model}', f'{attack}_{at_model}_dataset_{epsilon_dot_notation}')
+    #     csv_location = os.path.join('eval', f'flac_{attack}_{at_model}_{epsilon_dot_notation}.csv')
 
+    flac_directory = os.path.join('attacks', f'{attack}_data', f'{attack}_dataset_{epsilon_dot_notation}')
+    # specify full path in which csv file has to be saved
+    csv_location = os.path.join('eval', f'flac_{attack}_{at_model}_{epsilon_dot_notation}.csv')
 
     if os.path.exists(csv_location):
         os.remove(csv_location)
@@ -107,6 +108,10 @@ def init_eval(config, attack=None, at_model=None, epsilon=None):
     resnet_model = SpectrogramModel().to(device)
     resnet_model.load_state_dict(torch.load(config['model_path_spec'], map_location=device), strict=False)
 
+    print("Number of layers:", len(list(resnet_model.modules())))
+    total_params = sum(p.numel() for p in resnet_model.parameters())
+    print("Total number of parameters:", total_params)
+
     if attack == 'FGSM':
         # perform the evaluation on the dataset attacked with FGSM on ResNet and a certain epsilon value
         epsilon_str = str(epsilon).replace('.', 'dot')
@@ -137,4 +142,4 @@ if __name__ == '__main__':
     '''
 
     #init_eval(config_res, attack=None, at_model=None, epsilon=None)
-    init_eval(config_res, attack='FGSM', at_model='ResNet', epsilon=0.0)
+    init_eval(config_res, attack='FGSM', at_model='ResNet', epsilon=3.0)

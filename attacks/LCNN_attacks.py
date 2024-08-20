@@ -1,6 +1,8 @@
 from src.utils import *
 import os
 import librosa
+import gc
+from GPUtil import showUtilization as gpu_usage
 import torch.nn.functional as F
 from sp_utils import recover_mag_spec, retrieve_single_audio
 from src.LCNN_model.LCNN_model import LCNN
@@ -146,7 +148,7 @@ def BIM_CUT_LCNN(epsilon, config, model, df_eval, device):
 
 
         time_taken = time.time() - start_time
-        tqdm.write(f'Time taken: {time_taken} | Stopped at iter: {stop_iter} | effectiveness: {effectiveness*100:.2f}% | alpha total: {alpha*(stop_iter+1)}')
+        tqdm.write(f'Time taken: {time_taken} | Stopped at iter: {stop_iter} | effectiveness: {effectiveness*100:.2f}% | total pert: {alpha*(stop_iter+1)}')
 
 
 def FGSM_LCNN(epsilon, config, model, df_eval, device):
@@ -160,6 +162,8 @@ def FGSM_LCNN(epsilon, config, model, df_eval, device):
     # ATTACK
     # attack loader returns [X_win, y, time_frames, index]
     for batch_x, batch_y, time_frames, index in tqdm(data_loader, total=len(data_loader)):
+        start_time = time.time()
+
         batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
         batch_x.requires_grad = True
@@ -169,6 +173,14 @@ def FGSM_LCNN(epsilon, config, model, df_eval, device):
         loss.backward()
         grad = batch_x.grad.data
         perturbed_batch = batch_x + epsilon * grad.sign()
+
+        predictions = model(perturbed_batch)
+        predicted_labels = torch.argmax(predictions, dim=1)
+        wrong_predictions = (predicted_labels != batch_y)
+        effectiveness = wrong_predictions.float().mean()
+        effectiveness_percentage = effectiveness * 100
+
+        del batch_x, batch_y, grad
 
         perturbed_batch = perturbed_batch.squeeze(0).detach()
         perturbed_batch = perturbed_batch.cpu()
@@ -189,6 +201,12 @@ def FGSM_LCNN(epsilon, config, model, df_eval, device):
                                  sr=16000,
                                  epsilon=epsilon,
                                  attack='FGSM_LCNN')
+
+        time_taken = time.time() - start_time
+        tqdm.write(f'Time taken: {time_taken} | effectiveness: {effectiveness_percentage:.2f}% ')
+        del perturbed_batch, time_frames
+        torch.cuda.empty_cache()
+        gc.collect()
 
 def FGSM_LCNN_UNCUT(epsilon, config, model, df_eval, device):
     attack = 'FGSM_UNCUT'
@@ -272,8 +290,8 @@ if __name__ == '__main__':
     model.eval()
     print('Model loaded\n')
 
-    epsilon = 2.0
+    epsilon = 1.0
 
-    FGSM_LCNN_UNCUT(epsilon, config, model, df_eval, device)
+    FGSM_LCNN(epsilon, config, model, df_eval, device)
     #BIM_CUT_LCNN(epsilon, config, model, df_eval, device)
 

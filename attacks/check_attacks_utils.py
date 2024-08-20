@@ -128,15 +128,18 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
     eval_path = os.path.join('..', config['df_eval_path'])  #eval dataset of ASVSpoof2019
 
     # set the path to the perturbed dataset
-    if attack == 'FGSM' and attack_model == 'ResNet':
-        folder = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}')
-        pert_file = f'FGSM_LA_E_{file_number}_{epsilon_str}.flac'
-        file_path = os.path.join(folder, pert_file)
-    else:
-        folder = os.path.join(f'{attack}_{attack_model}', f'{attack}_{attack_model}_dataset_{epsilon_str}')
-        pert_file = f'{attack}_{attack_model}_LA_E_{file_number}_{epsilon_str}.flac'
-        file_path = os.path.join(folder, pert_file)
+    # if attack == 'FGSM' and attack_model == 'ResNet':
+    #     folder = os.path.join('FGSM_data', f'FGSM_dataset_{epsilon_str}')
+    #     pert_file = f'FGSM_LA_E_{file_number}_{epsilon_str}.flac'
+    #     file_path = os.path.join(folder, pert_file)
+    # else:
+    #     folder = os.path.join(f'{attack}_{attack_model}', f'{attack}_{attack_model}_dataset_{epsilon_str}')
+    #     pert_file = f'{attack}_{attack_model}_LA_E_{file_number}_{epsilon_str}.flac'
+    #     file_path = os.path.join(folder, pert_file)
 
+    folder = os.path.join(f'{attack}_{attack_model}', f'{attack}_{attack_model}_dataset_{epsilon_str}')
+    pert_file = f'{attack}_{attack_model}_LA_E_{file_number}_{epsilon_str}.flac'
+    file_path = os.path.join(folder, pert_file)
 
     original_audio, _ = get_original_audio(file_number)
     original_spec = get_og_spec(original_audio)
