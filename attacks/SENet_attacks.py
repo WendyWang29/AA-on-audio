@@ -279,11 +279,11 @@ if __name__ == '__main__':
     model.eval()
     print('Model loaded\n')
 
-    epsilon = 1.0
+    epsilon = 4.0
 
     #FGSM_UNCUT_SENet(epsilon, config, model, df_eval, device)
 
-    BIM_SENet(epsilon, config, model, df_eval, device)
+    FGSM_SENet(epsilon, config, model, df_eval, device)
 
 
 

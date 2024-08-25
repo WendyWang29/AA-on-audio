@@ -38,7 +38,7 @@ def create_csv(attack, at_model, epsilon):
     #     flac_directory = os.path.join('attacks', f'{attack}_{at_model}', f'{attack}_{at_model}_dataset_{epsilon_dot_notation}')
     #     csv_location = os.path.join('eval', f'flac_{attack}_{at_model}_{epsilon_dot_notation}.csv')
 
-    flac_directory = os.path.join('attacks', f'{attack}_data', f'{attack}_dataset_{epsilon_dot_notation}')
+    flac_directory = os.path.join('attacks', f'{attack}_{at_model}', f'{attack}_{at_model}_dataset_{epsilon_dot_notation}')
     # specify full path in which csv file has to be saved
     csv_location = os.path.join('eval', f'flac_{attack}_{at_model}_{epsilon_dot_notation}.csv')
 
@@ -142,4 +142,4 @@ if __name__ == '__main__':
     '''
 
     #init_eval(config_res, attack=None, at_model=None, epsilon=None)
-    init_eval(config_res, attack='FGSM', at_model='ResNet', epsilon=3.0)
+    init_eval(config_res, attack='FGSM', at_model='SENet', epsilon=3.0)

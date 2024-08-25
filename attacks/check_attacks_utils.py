@@ -137,30 +137,56 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
     #     pert_file = f'{attack}_{attack_model}_LA_E_{file_number}_{epsilon_str}.flac'
     #     file_path = os.path.join(folder, pert_file)
 
-    folder = os.path.join(f'{attack}_{attack_model}', f'{attack}_{attack_model}_dataset_{epsilon_str}')
-    pert_file = f'{attack}_{attack_model}_LA_E_{file_number}_{epsilon_str}.flac'
-    file_path = os.path.join(folder, pert_file)
+    if attack == None and epsilon == None and attack_model == None:
+        GT_label = get_GT_label(file_number, eval_path)
+        clean_path = '/nas/public/dataset/asvspoof2019/LA/ASVspoof2019_LA_eval/flac'
+        file_number = str(file_number)
+        clean_path = os.path.join(clean_path, f'LA_E_{file_number}' + '.flac')
 
-    original_audio, _ = get_original_audio(file_number)
-    original_spec = get_og_spec(original_audio)
-    perturbed_audio, _ = librosa.load(file_path, sr=None, duration=240, mono=True)
+        audio, _ = librosa.load(clean_path, sr=None, duration=240, mono=True)
+        original_audio = audio
+        perturbed_audio = audio
+        out, predicted_label, perturbed_spec = get_model_prediction(eval_model, perturbed_audio, device, flag)
 
-    # evaluate the file
-    GT_label = get_GT_label(file_number, eval_path)
-    out, predicted_label, perturbed_spec = get_model_prediction(eval_model, perturbed_audio, device, flag)
-    predicted_label = str(predicted_label.item())
+        original_spec = perturbed_spec
 
-    print(f'--> File name: {pert_file}\n'
-          f'--> Model evaluated: {string}\n'
-          f'--> Attack: {attack} on {attack_model}\n'
-          f'--> Epsilon: {epsilon}\n'
-          f'--> GT label: {GT_label}\n',
-          f'--> Predicted label: {predicted_label}, \n{out}\n'
-          f'--> Confidence: {compute_confidence(out):.2f} %')
+        print(f'--> File number: {file_number}\n'
+              f'--> Model evaluated: {string}\n'
+              f'--> Attack: None\n'
+              f'--> Epsilon: None'
+              f'--> GT label: {GT_label}\n',
+              f'--> Predicted label: {predicted_label}, \n{out}\n'
+              f'--> Confidence: {compute_confidence(out):.2f} %')
+    else:
+        folder = os.path.join(f'{attack}_{attack_model}', f'{attack}_{attack_model}_dataset_{epsilon_str}')
+        pert_file = f'{attack}_{attack_model}_LA_E_{file_number}_{epsilon_str}.flac'
+        file_path = os.path.join(folder, pert_file)
 
+        original_audio, _ = get_original_audio(file_number)
+        original_spec = get_og_spec(original_audio)
+        perturbed_audio, _ = librosa.load(file_path, sr=None, duration=240, mono=True)
 
+        # evaluate the file
+        GT_label = get_GT_label(file_number, eval_path)
+        out, predicted_label, perturbed_spec = get_model_prediction(eval_model, perturbed_audio, device, flag)
+        predicted_label = str(predicted_label.item())
+
+        print(f'--> File name: {pert_file}\n'
+              f'--> Model evaluated: {string}\n'
+              f'--> Attack: {attack} on {attack_model}\n'
+              f'--> Epsilon: {epsilon}\n'
+              f'--> GT label: {GT_label}\n',
+              f'--> Predicted label: {predicted_label}, \n{out}\n'
+              f'--> Confidence: {compute_confidence(out):.2f} %')
 
     return perturbed_audio, original_audio, perturbed_spec, original_spec
+
+
+
+
+
+
+
 
 
 def extract_id(file_path):
