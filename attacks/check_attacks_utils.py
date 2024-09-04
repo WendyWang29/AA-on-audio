@@ -157,6 +157,29 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
               f'--> GT label: {GT_label}\n',
               f'--> Predicted label: {predicted_label}, \n{out}\n'
               f'--> Confidence: {compute_confidence(out):.2f} %')
+
+    elif attack == 'QUANT_ENS' and attack_model == None:
+        folder = os.path.join('Ensemble', f'QUANT_ENS_70_90_{epsilon_str}')
+        pert_file = f'QUANT_ENS_70_90_{epsilon_str}_{file_number}.flac'
+        file_path = os.path.join(folder, pert_file)
+
+        original_audio, _ = get_original_audio(file_number)
+        original_spec = get_og_spec(original_audio)
+        perturbed_audio, _ = librosa.load(file_path, sr=None, duration=240, mono=True)
+
+        # evaluate the file
+        GT_label = get_GT_label(file_number, eval_path)
+        out, predicted_label, perturbed_spec = get_model_prediction(eval_model, perturbed_audio, device, flag)
+        predicted_label = str(predicted_label.item())
+
+        print(f'--> File name: {pert_file}\n'
+              f'--> Model evaluated: {string}\n'
+              f'--> Attack: QUANT_ENS 70 90\n'
+              f'--> GT label: {GT_label}\n',
+              f'--> Predicted label: {predicted_label}, \n{out}\n'
+              f'--> Confidence: {compute_confidence(out):.2f} %')
+
+
     else:
         folder = os.path.join(f'{attack}_{attack_model}', f'{attack}_{attack_model}_dataset_{epsilon_str}')
         pert_file = f'{attack}_{attack_model}_LA_E_{file_number}_{epsilon_str}.flac'
