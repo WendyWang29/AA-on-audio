@@ -60,14 +60,14 @@ def create_csv(attack, at_model, epsilon):
 
     return csv_location
 
-def ResNet_eval(model, save_path, config, device, attack, at_model, epsilon=None, df_eval=None):
+def ResNet_eval(model, save_path, config, device, attack, at_model, type_of_spec, epsilon=None, df_eval=None):
 
     if epsilon != None:
         # attack case --> create list of evaluation files from the attacked dataset
         path_to_csv = create_csv(attack, at_model, epsilon)
         df_eval = pd.read_csv(path_to_csv)
         file_eval = list(df_eval['path'])
-    elif epsilon == None and df_eval != None:
+    elif epsilon == None:
         # clean case --> use the clean eval dataset
         file_eval = list(df_eval['path'])
     else:
@@ -77,7 +77,7 @@ def ResNet_eval(model, save_path, config, device, attack, at_model, epsilon=None
         print(f'save_path exists, removing it to create a new one')
         os.system(f'rm {save_path}')
 
-    feat_set = LoadEvalData_ResNet(list_IDs=file_eval, win_len=config_res['win_len'], config=config)
+    feat_set = LoadEvalData_ResNet(list_IDs=file_eval, win_len=config_res['win_len'], config=config, type_of_spec=type_of_spec)
     feat_loader = DataLoader(feat_set, batch_size=config_res['eval_batch_size'], shuffle=False, num_workers=15)
 
     model.eval()
@@ -102,11 +102,14 @@ def ResNet_eval(model, save_path, config, device, attack, at_model, epsilon=None
         print('Scores saved to {}'.format(save_path))
 
 
-def init_eval(config, attack=None, at_model=None, epsilon=None):
+def init_eval(config, type_of_spec, attack=None, at_model=None, epsilon=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     resnet_model = SpectrogramModel().to(device)
-    resnet_model.load_state_dict(torch.load(config['model_path_spec'], map_location=device), strict=False)
+    if type_of_spec == 'mag':
+        resnet_model.load_state_dict(torch.load(config['model_path_spec_mag'], map_location=device), strict=False)
+    elif type_of_spec == 'pow':
+        resnet_model.load_state_dict(torch.load(config['model_path_spec_pow'], map_location=device), strict=False)
 
     print("Number of layers:", len(list(resnet_model.modules())))
     total_params = sum(p.numel() for p in resnet_model.parameters())
@@ -116,13 +119,17 @@ def init_eval(config, attack=None, at_model=None, epsilon=None):
         # perform the evaluation on the dataset attacked with FGSM on ResNet and a certain epsilon value
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = f'./eval/prob_ResNet_{attack}_{at_model}_{epsilon_str}.csv'
-        ResNet_eval(resnet_model, save_path, config, device, attack, at_model, epsilon, df_eval=None)
+        ResNet_eval(resnet_model, save_path, config, device, attack, at_model, type_of_spec, epsilon, df_eval=None)
 
     elif attack == None:
         # perform the evaluation on the clean dataset ASVSpoof2019
         df_eval = pd.read_csv(config['df_eval_path'])
-        save_path = './eval/prob_ResNet_spec_eval.csv'
-        ResNet_eval(resnet_model, save_path, config, device, epsilon=None, df_eval=df_eval)
+        if type_of_spec == 'mag':
+            save_path = './eval/prob_ResNet_spec_eval_mag.csv'
+        elif type_of_spec == 'pow':
+            save_path = './eval/prob_ResNet_spec_eval.csv'
+
+        ResNet_eval(resnet_model, save_path, config, device, attack, at_model, type_of_spec, df_eval=df_eval, epsilon=None)
 
     else:
         print('todo')
@@ -140,6 +147,6 @@ if __name__ == '__main__':
     at_model: 'ResNet', 'SENet' (model used to perform the attack)
     epsilon: values like 1.0, 2.0....
     '''
-
-    #init_eval(config_res, attack=None, at_model=None, epsilon=None)
-    init_eval(config_res, attack='FGSM', at_model='SENet', epsilon=3.0)
+    type_of_spec = 'mag'
+    init_eval(config_res, type_of_spec=type_of_spec, attack=None, at_model=None, epsilon=None)
+    #init_eval(config_res, type_of_spec=type_of_spec, attack='FGSM', at_model='SENet', epsilon=3.0)

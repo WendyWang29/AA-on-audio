@@ -1,6 +1,5 @@
 """
 SIGNAL PROCESSING UTILS
-#TODO delete from tests.tests.py
 """
 import librosa
 import numpy as np

@@ -165,7 +165,7 @@ def get_loss_resnet(data_loader, model, device):
 #     return data
 
 
-def get_features(wav_path, features, args, X, cached=True, force=False):
+def get_features(wav_path, features, args, type_of_spec, X, cached=False, force=False):
     """
     Extract features chosen by features argument.
 
@@ -178,7 +178,7 @@ def get_features(wav_path, features, args, X, cached=True, force=False):
     :return: extracted features
     :rtype np.array
     """
-    def get_feats(wav_path, X):
+    def get_feats(wav_path, type_of_spec=type_of_spec, X=X):
 
         # if X.all() == None:
         X, fs = read_audio(wav_path)
@@ -186,7 +186,7 @@ def get_features(wav_path, features, args, X, cached=True, force=False):
         args['hop_size'] = None
 
         if features == 'spec':
-            return get_log_spectrum(wav_path, X, args['fsamp'], win_len=args['win_len'], hop_size=args['hop_size'])
+            return get_log_spectrum(wav_path=wav_path, type_of_spec=type_of_spec, X=X, win_len=args['win_len'], hop_size=args['hop_size'], fs=args['fsamp'])
         elif features == 'mfcc':
             return compute_mfcc_feats(wav_path, X, args['fsamp'], win_len=args['win_len'], hop_size=args['hop_size'])
         else:
@@ -255,7 +255,7 @@ class LoadAttackData_ResNet(Dataset):
 
 
 class LoadTrainData_ResNet(Dataset):
-    def __init__(self, list_IDs, labels, win_len, config):
+    def __init__(self, list_IDs, labels, win_len, config, type_of_spec):
         """
         self.list_IDs	: list of strings (each string: utt key),
         self.labels      : dictionary (key: utt key, value: label integer)
@@ -265,6 +265,7 @@ class LoadTrainData_ResNet(Dataset):
         self.labels = labels
         self.win_len = win_len
         self.config = config
+        self.type_of_spec = type_of_spec
 
 
     def __len__(self):
@@ -273,7 +274,7 @@ class LoadTrainData_ResNet(Dataset):
     def __getitem__(self, index):
         track = self.list_IDs[index]
         y = self.labels[track]
-        X = get_features(track, self.config['features'], self.config, X=None, cached=True)
+        X = get_features(track, self.config['features'], self.config, self.type_of_spec, X=None, cached=True)
 
         feature_len = X.shape[1]
         
@@ -299,7 +300,7 @@ class LoadTrainData_ResNet(Dataset):
 
 
 class LoadEvalData_ResNet(Dataset):
-    def __init__(self, list_IDs, win_len, config):
+    def __init__(self, list_IDs, win_len, config, type_of_spec):
         """
         self.list_IDs	: list of strings (each string: utt key),
         self.labels      : dictionary (key: utt key, value: label integer)
@@ -308,13 +309,14 @@ class LoadEvalData_ResNet(Dataset):
         self.list_IDs = list_IDs
         self.win_len = win_len
         self.config = config
+        self.type_of_spec = type_of_spec
 
     def __len__(self):
         return len(self.list_IDs)
 
     def __getitem__(self, index):
         track = self.list_IDs[index]
-        X = get_features(track, self.config['features'], self.config, X=None, cached=True)
+        X = get_features(track, self.config['features'], self.config, self.type_of_spec, X=None, cached=True)
         #X = get_features_1(track)
 
         feature_len = X.shape[1]

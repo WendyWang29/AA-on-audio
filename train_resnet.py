@@ -12,15 +12,25 @@ from src.resnet_model import SpectrogramModel, MFCCModel
 from src.resnet_utils import LoadTrainData_ResNet, train_epoch_resnet, evaluate_accuracy_resnet, get_loss_resnet, evaluate_metrics
 from src.utils import *
 from sklearn import model_selection
+import sys
 
 
-def main(config):
+def main(config, type_of_spec):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     assert config['features'] in ['spec', 'mfcc'], 'Not supported feature'
-    model_tag = 'model_{}_{}_{}_{}'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
-    model_save_path = os.path.join(config['model_folder'], model_tag)
+
+    if type_of_spec == 'pow':
+        model_tag = 'model_{}_{}_{}_{}'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+        model_save_path = os.path.join(config['model_folder_pow'], model_tag)
+    elif type_of_spec == 'mag':
+        model_tag = 'model_{}_{}_{}_{}_mag'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+        model_save_path = os.path.join(config['model_folder_mag'], model_tag)
+    else:
+        print('You need to choose what kind of spectrogram you want to work with between power and mag')
+        sys.exit()
+
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
 
@@ -38,14 +48,14 @@ def main(config):
 
     d_label_trn = dict(zip(df_train['path'], df_train['label']))
     file_train = list(df_train['path'])
-    train_set = LoadTrainData_ResNet(list_IDs=file_train, labels=d_label_trn, win_len=config['win_len'], config=config)
+    train_set = LoadTrainData_ResNet(list_IDs=file_train, labels=d_label_trn, win_len=config['win_len'], config=config, type_of_spec=type_of_spec)
     train_loader = DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=15)
     del train_set, d_label_trn
 
     # define validation dataloader
     d_label_dev = dict(zip(df_dev['path'], df_dev['label']))
     file_dev = list(df_dev['path'])
-    dev_set = LoadTrainData_ResNet(list_IDs=file_dev, labels=d_label_dev, win_len=config['win_len'], config=config)
+    dev_set = LoadTrainData_ResNet(list_IDs=file_dev, labels=d_label_dev, win_len=config['win_len'], config=config, type_of_spec=type_of_spec)
     dev_loader = DataLoader(dev_set, batch_size=config['batch_size'], shuffle=True, num_workers=15)
     del dev_set, d_label_dev
 
@@ -84,4 +94,6 @@ if __name__ == '__main__':
     config_path = 'config/residualnet_train_config.yaml'
     config_res = read_yaml(config_path)
 
-    main(config_res)
+    type_of_spec = 'pow' # 'mag'
+
+    main(config_res, type_of_spec)

@@ -17,7 +17,7 @@ from sklearn import model_selection
 
 def main(config):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model_tag = 'model_{}_{}_{}_{}'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+    model_tag = 'model_{}_{}_{}_{}_mag'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
     model_save_path = os.path.join(config['model_folder'], model_tag)
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)

@@ -9,6 +9,7 @@ logging.getLogger('matplotlib.pyplot').setLevel(logging.ERROR)
 
 from src.utils import *
 import os
+import sys
 import librosa
 import soundfile as sf
 from src.resnet_model import SpectrogramModel
@@ -142,7 +143,8 @@ def Ensemble_Attack_SingleFile(file_number,
                                device,
                                ResNet_model,
                                SENet_model,
-                               method=1):
+                               method=1,
+                               type_of_spec='mag'):
 
     GT_label = get_GT_label(file_number, eval_path)
 
@@ -151,16 +153,19 @@ def Ensemble_Attack_SingleFile(file_number,
     file_number = str(file_number)
     clean_path = os.path.join(clean_path, f'LA_E_{file_number}' + '.flac')
     audio, _ = librosa.load(clean_path, sr=None, duration=240, mono=True)
-    og_spec = compute_spectrum(audio)
+    og_spec = compute_spectrum(audio, type_of_spec=type_of_spec)
+
     # clean spec --> mini batch --> clean predictions
     resnet_pred, resnet_pred_label, clean_spec = get_model_prediction(eval_model=ResNet_model,
                                                                       pert_audio=audio,
                                                                       device=device,
+                                                                      type_of_spec=type_of_spec,
                                                                       flag=0)
 
     senet_pred, senet_pred_label, clean_spec = get_model_prediction(eval_model=SENet_model,
                                                                     pert_audio=audio,
                                                                     device=device,
+                                                                    type_of_spec=type_of_spec,
                                                                     flag=1)
     print(f'---> File number: {file_number}\n',
           f'--> GT label: {GT_label}\n',
@@ -207,7 +212,7 @@ def Ensemble_Attack_SingleFile(file_number,
         NORMALIZATION AND PICKING THE MOST VALUABLE VALUE
         '''
         new_grad = method_2(grad_res, grad_sen)
-    elif method == 3:
+    elif method == 4:
         '''
         NORMAL FGSM ON SENet
         '''
@@ -219,11 +224,42 @@ def Ensemble_Attack_SingleFile(file_number,
               f'--> GT label: {GT_label}\n',
               f'--> Predicted label ResNet: {FGSMSEn_label_res.item()} --- Confidence: {compute_confidence(FGSMSEn_pred_res):.2f} % --- {FGSMSEn_pred_res.tolist()}\n',
               f'--> Predicted label SENet: {FGSMSEn_label_sen.item()} --- Confidence SENet: {compute_confidence(FGSMSEn_pred_sen):.2f} % --- {FGSMSEn_pred_sen.tolist()}\n')
+
+        # convert and save audio
+        pert_batch = pert_batch_z.squeeze(dim=0).detach().cpu().numpy()
+        og_len = og_spec.shape[1]  # og_spec is the original audio's spectrogram
+        sliced_spec = pert_batch[:, :og_len]
+
+        if type_of_spec == 'mag':
+            # mag spec is ready already
+            mag_spec = sliced_spec
+        elif type_of_spec == 'pow':
+            # we need to recover the mag spec
+            mag_spec = recover_mag_spec(sliced_spec)
+        else:
+            sys.exit('Invalid type_of_spec')
+
+        phase = np.angle(librosa.stft(y=audio, n_fft=2048, hop_length=512, center=False))
+        phase = phase[:, :og_len]
+        p_audio = librosa.istft(mag_spec * np.exp(1j * phase), n_fft=2048, hop_length=512)
+
+        epsilon_str = str(epsilon).replace('.', 'dot')
+        folder = 'FGSM_mag_SENet'
+        subfolder = f'FGSM_mag_SENet_dataset_{epsilon_str}'
+        folder_ = os.path.join(folder, subfolder)
+        os.makedirs(folder_, exist_ok=True)
+        file_path = os.path.join(folder, subfolder, f'FGSM_mag_SENet_LA_E_{file_number}_{epsilon_str}.flac')
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        sr = 16000
+        sf.write(file_path, p_audio, sr, format='FLAC')
+
         del pert_batch_z
 
-    elif method == 4:
+    elif method == 3:
         '''
-         NORMAL FGSM ON SENet
+         NORMAL FGSM ON ResNet
         '''
         pert_batch_x = batch_x + epsilon * grad_res.sign()
         FGSMRes_pred_res, FGSMRes_label_res = model_pred_batch(ResNet_model, 'ResNet', pert_batch_x)
@@ -233,6 +269,37 @@ def Ensemble_Attack_SingleFile(file_number,
               f'--> GT label: {GT_label}\n',
               f'--> Predicted label ResNet: {FGSMRes_label_res.item()} --- Confidence: {compute_confidence(FGSMRes_pred_res):.2f} % --- {FGSMRes_pred_res.tolist()}\n',
               f'--> Predicted label SENet: {FGSMRes_label_sen.item()} --- Confidence SENet: {compute_confidence(FGSMRes_pred_sen):.2f} % --- {FGSMRes_pred_sen.tolist()}\n')
+
+        # convert and save audio
+        pert_batch = pert_batch_x.squeeze(dim=0).detach().cpu().numpy()
+        og_len = og_spec.shape[1]  # og_spec is the original audio's spectrogram
+        sliced_spec = pert_batch[:, :og_len]
+
+        if type_of_spec == 'mag':
+            # mag spec is ready already
+            mag_spec = sliced_spec
+        elif type_of_spec == 'pow':
+            # we need to recover the mag spec
+            mag_spec = recover_mag_spec(sliced_spec)
+        else:
+            sys.exit('Invalid type_of_spec')
+
+        phase = np.angle(librosa.stft(y=audio, n_fft=2048, hop_length=512, center=False))
+        phase = phase[:, :og_len]
+        p_audio = librosa.istft(mag_spec * np.exp(1j * phase), n_fft=2048, hop_length=512)
+
+        epsilon_str = str(epsilon).replace('.', 'dot')
+        folder = 'FGSM_mag_ResNet'
+        subfolder = f'FGSM_mag_ResNet_dataset_{epsilon_str}'
+        folder_ = os.path.join(folder, subfolder)
+        os.makedirs(folder_, exist_ok=True)
+        file_path = os.path.join(folder, subfolder, f'FGSM_mag_ResNet_LA_E_{file_number}_{epsilon_str}.flac')
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        sr = 16000
+        sf.write(file_path, p_audio, sr, format='FLAC')
+
         del pert_batch_x
 
     elif method == 5:
@@ -378,6 +445,11 @@ if __name__ == '__main__':
     set_gpu(-1)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+    '''
+    IMPORTANT: set 'mag' or 'pow' models
+    '''
+    type_of_spec = 'mag'  # 'pow'
+
     config_ResNet_path = '../config/residualnet_train_config.yaml'
     config_SENet_path = '../config/SENet.yaml'
 
@@ -386,26 +458,33 @@ if __name__ == '__main__':
 
     df_eval = pd.read_csv(os.path.join('..', config_ResNet['df_eval_path']))
 
-    # load the models
     ResNet_model = SpectrogramModel().to(device)
-    ResNet_model.load_state_dict(torch.load(os.path.join('..', config_ResNet['model_path_spec']), map_location=device), strict=False)
-    ResNet_model.eval()
     SENet_model = se_resnet34_custom(num_classes=2).to(device)
-    SENet_model.load_state_dict(torch.load(os.path.join('..', config_SENet['model_path_spec']), map_location=device), strict=False)
+
+    if type_of_spec == 'mag':
+        ResNet_model.load_state_dict(torch.load(os.path.join('..', config_ResNet['model_path_spec_mag']), map_location=device), strict=False)
+        SENet_model.load_state_dict(torch.load(os.path.join('..', config_SENet['model_path_spec_mag']), map_location=device), strict=False)
+    elif type_of_spec == 'pow':
+        ResNet_model.load_state_dict(torch.load(os.path.join('..', config_ResNet['model_path_spec']), map_location=device), strict=False)
+        SENet_model.load_state_dict(torch.load(os.path.join('..', config_SENet['model_path_spec']), map_location=device), strict=False)
+
+    ResNet_model.eval()
     SENet_model.eval()
-    print('Models loaded...\n')
+
+    print(f'Models ({type_of_spec}) loaded...\n')
 
     eval_path = os.path.join('..', config_SENet['df_eval_path'])  # eval dataset of ASVSpoof2019
 
-    epsilon = 2.0
+    epsilon = 1.0
     file_number = 2520601
-    method = 4
-    print(f'Epsilon: {epsilon}, method: {method}')
+    method = 3
+
+    print(f'Epsilon: {epsilon}, method: {method}\n')
     '''
     method = 1 --> avg of the grads
     method = 2 --> picking
-    method = 3 --> normal FGSM on SENet
-    method = 4 --> normal FGSM on ResNet
+    method = 3 --> normal FGSM on ResNet
+    method = 4 --> normal FGSM on SENet
     method = 5 --> percentiles
     method = 6 --> percentiles and audio
     '''
@@ -416,6 +495,7 @@ if __name__ == '__main__':
                                device,
                                ResNet_model,
                                SENet_model,
-                               method)
+                               method,
+                               type_of_spec=type_of_spec)
 
 

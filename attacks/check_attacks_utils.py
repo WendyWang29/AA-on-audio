@@ -8,11 +8,16 @@ from src.resnet_model import SpectrogramModel
 from src.LCNN_model.LCNN_model import LCNN
 from src.SENet.SENet_model import se_resnet34_custom
 
-def load_resnet(device):
+def load_resnet(device, type_of_spec):
     config_path = '../config/residualnet_train_config.yaml'
     config = read_yaml(config_path)
     model = SpectrogramModel().to(device)
-    model.load_state_dict(torch.load(os.path.join('..', config["model_path_spec"]), map_location=device))
+    if type_of_spec == 'mag':
+        model.load_state_dict(torch.load(os.path.join('..', config["model_path_spec_mag"]), map_location=device))
+    elif type_of_spec == 'pow':
+        model.load_state_dict(torch.load(os.path.join('..', config["model_path_spec_pow"]), map_location=device))
+    else:
+        sys.exit(f'{type_of_spec} is an invalid type of spectrogram')
     model.eval()
     return model, config
 
@@ -24,11 +29,14 @@ def load_lcnn(device):
     model.eval()
     return model, config
 
-def load_senet(device):
+def load_senet(device, type_of_spec):
     config_path = '../config/SENet.yaml'
     config = read_yaml(config_path)
     model = se_resnet34_custom(num_classes=2).to(device)
-    model.load_state_dict(torch.load(os.path.join('..', config['model_path_spec']), map_location=device))
+    if type_of_spec == 'mag':
+        model.load_state_dict(torch.load(os.path.join('..', config["model_path_spec_mag"]), map_location=device))
+    elif type_of_spec == 'pow':
+        model.load_state_dict(torch.load(os.path.join('..', config["model_path_spec_pow"]), map_location=device))
     model.eval()
     return model, config
 
@@ -56,8 +64,8 @@ def get_GT_label(file_number, eval_path):
     else:
         pass
 
-def get_model_prediction(eval_model, pert_audio, device, flag=None):
-    spec = compute_spectrum(pert_audio)
+def get_model_prediction(eval_model, pert_audio, device, type_of_spec, flag=0):
+    spec = compute_spectrum(pert_audio, type_of_spec=type_of_spec)
     spec_length = spec.shape[1]
     net_input_shape = 28 * 3
     if spec_length < net_input_shape:
@@ -77,8 +85,8 @@ def get_model_prediction(eval_model, pert_audio, device, flag=None):
     pred_label = torch.argmax(probabilities)
     return out, pred_label, spec
 
-def get_og_spec(original_audio):
-    spec = compute_spectrum(original_audio)
+def get_og_spec(original_audio, type_of_spec):
+    spec = compute_spectrum(original_audio, type_of_spec)
     spec_length = spec.shape[1]
     net_input_shape = 28 * 3
     if spec_length < net_input_shape:
@@ -96,7 +104,7 @@ def compute_confidence(out):
 
 
 
-def check_attack(eval_model, attack_model, attack, file_number, epsilon, device):
+def check_attack(eval_model, attack_model, attack, file_number, epsilon, type_of_spec, device):
     '''
     Check one perturbed (attacked) audio
     :param eval_model: model on which we want to test the perturbed audio
@@ -104,21 +112,22 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
     :param attack: attack used (FGSM or BIM)
     :param file_number: file identifying number
     :param epsilon: epsilon used
+    :param type_of_spec: 'mag' or 'pow'
     :param device: device
     :return: perturbed file name, perturbed audio, original audio
     '''
-    flag = 0
+    flag = 0  # if SENet flag will change to 1
     string = eval_model
 
     # load the evaluation model
     if eval_model == 'ResNet':
-        eval_model, config = load_resnet(device)
+        eval_model, config = load_resnet(device, type_of_spec)
     elif eval_model == 'RawNet':
         pass
     elif eval_model == 'LCNN':
         eval_model, config = load_lcnn(device)
     elif eval_model == 'SENet':
-        eval_model, config = load_senet(device)
+        eval_model, config = load_senet(device, type_of_spec)
         flag = 1  # to identify SENet model
     else:
         print('Invalid evaluation model')
@@ -137,6 +146,7 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
     #     pert_file = f'{attack}_{attack_model}_LA_E_{file_number}_{epsilon_str}.flac'
     #     file_path = os.path.join(folder, pert_file)
 
+
     if attack == None and epsilon == None and attack_model == None:
         GT_label = get_GT_label(file_number, eval_path)
         clean_path = '/nas/public/dataset/asvspoof2019/LA/ASVspoof2019_LA_eval/flac'
@@ -146,7 +156,12 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
         audio, _ = librosa.load(clean_path, sr=None, duration=240, mono=True)
         original_audio = audio
         perturbed_audio = audio
-        out, predicted_label, perturbed_spec = get_model_prediction(eval_model, perturbed_audio, device, flag)
+
+        out, predicted_label, perturbed_spec = get_model_prediction(eval_model=eval_model,
+                                                                    pert_audio=perturbed_audio,
+                                                                    device=device,
+                                                                    type_of_spec=type_of_spec,
+                                                                    flag=flag)
 
         original_spec = perturbed_spec
 
@@ -169,7 +184,11 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
 
         # evaluate the file
         GT_label = get_GT_label(file_number, eval_path)
-        out, predicted_label, perturbed_spec = get_model_prediction(eval_model, perturbed_audio, device, flag)
+        out, predicted_label, perturbed_spec = get_model_prediction(eval_model=eval_model,
+                                                                    pert_audio=perturbed_audio,
+                                                                    device=device,
+                                                                    type_of_spec=type_of_spec,
+                                                                    flag=flag)
         predicted_label = str(predicted_label.item())
 
         print(f'--> File name: {pert_file}\n'
@@ -181,17 +200,20 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, device)
 
 
     else:
+        '''
+        ALL THE NORMAL ATTACKS WHICH HAVE AN ATTACK_MODEL AND AN EVAL_MODEL
+        '''
         folder = os.path.join(f'{attack}_{attack_model}', f'{attack}_{attack_model}_dataset_{epsilon_str}')
         pert_file = f'{attack}_{attack_model}_LA_E_{file_number}_{epsilon_str}.flac'
         file_path = os.path.join(folder, pert_file)
 
         original_audio, _ = get_original_audio(file_number)
-        original_spec = get_og_spec(original_audio)
+        original_spec = get_og_spec(original_audio, type_of_spec)
         perturbed_audio, _ = librosa.load(file_path, sr=None, duration=240, mono=True)
 
         # evaluate the file
         GT_label = get_GT_label(file_number, eval_path)
-        out, predicted_label, perturbed_spec = get_model_prediction(eval_model, perturbed_audio, device, flag)
+        out, predicted_label, perturbed_spec = get_model_prediction(eval_model, perturbed_audio, device, type_of_spec, flag)
         predicted_label = str(predicted_label.item())
 
         print(f'--> File name: {pert_file}\n'

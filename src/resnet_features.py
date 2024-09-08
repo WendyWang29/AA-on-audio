@@ -5,6 +5,7 @@ import math
 import os
 import logging
 logging.basicConfig(level=logging.DEBUG)
+import sys
 
 from src.utils import *
 from src.audio_utils import *
@@ -15,25 +16,34 @@ def window_stack(a, stepsize=int(0.5*16000), width=int(1*16000)):
     return np.vstack(a[i:1+n+i-width:stepsize] for i in range(0, width))
 
 
-def compute_spectrum(x):
-    s = librosa.core.stft(x, n_fft=2048, win_length=2048, hop_length=512, center=False)
-    a = np.abs(s) ** 2
-    feat = librosa.power_to_db(a)
+
+def compute_spectrum(x, type_of_spec):
+    if type_of_spec == 'mag':
+        s = librosa.core.stft(x, n_fft=2048, win_length=2048, hop_length=512, center=False)
+        a = np.abs(s)
+        feat = a
+    elif type_of_spec == 'pow':
+        s = librosa.core.stft(x, n_fft=2048, win_length=2048, hop_length=512, center=False)
+        a = np.abs(s)
+        a = np.abs(s) ** 2
+        feat = librosa.power_to_db(a)
+    else:
+        sys.exit(f'{type_of_spec} is a wrong type of spectrogram')
 
     return feat
 
 
-def get_log_spectrum(wav_path, X, fs, win_len=None, hop_size=None):
+def get_log_spectrum(wav_path, type_of_spec, X, fs, win_len=None, hop_size=None):
     if win_len:
         X = window_stack(X, stepsize=int(hop_size*fs), width=int(win_len*fs)).T
 
         feat_list = []
         for x_win in X:
-            feat = compute_spectrum(x_win)
+            feat = compute_spectrum(x_win, type_of_spec)
             feat_list.append(feat.T)
         return np.array(feat_list)
     else:
-        feat = compute_spectrum(X)
+        feat = compute_spectrum(X, type_of_spec)
     return feat
 
 

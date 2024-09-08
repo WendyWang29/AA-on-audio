@@ -65,7 +65,7 @@ def SENet_eval(model, save_path, config, device, attack, at_model, epsilon=None,
         df_eval = pd.read_csv(path_to_csv)
         file_eval = list(df_eval['path'])
         print('ohoh')
-    elif epsilon == None and df_eval != None:
+    elif epsilon == None:
         file_eval = list(df_eval['path'])
     else:
         print('There is something wrong')
@@ -120,8 +120,8 @@ def init_eval(config, attack=None, at_model=None, epsilon=None):
     elif attack == None:
         # perform the evaluation on the clean dataset ASVSpoof2019
         df_eval = pd.read_csv(config['df_eval_path'])
-        save_path = './eval/prob_SENet_spec_eval.csv'
-        SENet_eval(SENet_model, save_path, config, device, epsilon=None, df_eval=df_eval)
+        save_path = './eval/prob_SENet_spec_eval_mag.csv'
+        SENet_eval(SENet_model, save_path, config, device, attack, at_model, df_eval=df_eval, epsilon=None)
 
     else:
         print('Attack should be <ResNet FGSM>, <SENet FGSM> or None')
@@ -140,5 +140,5 @@ if __name__ == '__main__':
     epsilon: values like 1.0, 2.0....
     '''
 
-    #init_eval(config_res, attack=None, at_model=None, epsilon=None)
-    init_eval(config_res, attack='FGSM', at_model='LCNN', epsilon=2.0)
+    init_eval(config_res, attack=None, at_model=None, epsilon=None)
+    #init_eval(config_res, attack='FGSM', at_model='LCNN', epsilon=2.0)
