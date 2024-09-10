@@ -23,7 +23,8 @@ def get_spectrogram_from_audio(audio_path):
     return spec
 
 def retrieve_single_audio(config, index):
-    df_eval = pd.read_csv(os.path.join('..', config["df_eval_path"]))
+    #df_eval = pd.read_csv(os.path.join('..', config["df_eval_path"]))
+    df_eval = pd.read_csv(os.path.join('..', config["df_eval_path_3s"]))
 
     # get list of all eval files and labels
     file_eval = list(df_eval['path'])

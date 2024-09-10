@@ -173,13 +173,13 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, type_of
               f'--> Predicted label: {predicted_label}, \n{out}\n'
               f'--> Confidence: {compute_confidence(out):.2f} %')
 
-    elif attack == 'QUANT_ENS' and attack_model == None:
+    elif attack == 'QUANT_ENS_70_90' and attack_model == None:
         folder = os.path.join('Ensemble', f'QUANT_ENS_70_90_{epsilon_str}')
         pert_file = f'QUANT_ENS_70_90_{epsilon_str}_{file_number}.flac'
         file_path = os.path.join(folder, pert_file)
 
         original_audio, _ = get_original_audio(file_number)
-        original_spec = get_og_spec(original_audio)
+        original_spec = get_og_spec(original_audio, type_of_spec)
         perturbed_audio, _ = librosa.load(file_path, sr=None, duration=240, mono=True)
 
         # evaluate the file
@@ -197,6 +197,32 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, type_of
               f'--> GT label: {GT_label}\n',
               f'--> Predicted label: {predicted_label}, \n{out}\n'
               f'--> Confidence: {compute_confidence(out):.2f} %')
+
+    elif attack == 'QUANT_ENS_90_70' and attack_model == None:
+        folder = os.path.join('Ensemble', f'QUANT_ENS_90_70_{epsilon_str}')
+        pert_file = f'QUANT_ENS_90_70_{epsilon_str}_{file_number}.flac'
+        file_path = os.path.join(folder, pert_file)
+
+        original_audio, _ = get_original_audio(file_number)
+        original_spec = get_og_spec(original_audio, type_of_spec)
+        perturbed_audio, _ = librosa.load(file_path, sr=None, duration=240, mono=True)
+
+        # evaluate the file
+        GT_label = get_GT_label(file_number, eval_path)
+        out, predicted_label, perturbed_spec = get_model_prediction(eval_model=eval_model,
+                                                                    pert_audio=perturbed_audio,
+                                                                    device=device,
+                                                                    type_of_spec=type_of_spec,
+                                                                    flag=flag)
+        predicted_label = str(predicted_label.item())
+
+        print(f'--> File name: {pert_file}\n'
+              f'--> Model evaluated: {string}\n'
+              f'--> Attack: QUANT_ENS 90 70\n'
+              f'--> GT label: {GT_label}\n',
+              f'--> Predicted label: {predicted_label}, \n{out}\n'
+              f'--> Confidence: {compute_confidence(out):.2f} %')
+
 
 
     else:

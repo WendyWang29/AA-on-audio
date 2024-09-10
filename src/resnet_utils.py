@@ -212,12 +212,12 @@ def get_features(wav_path, features, args, type_of_spec, X, cached=False, force=
             return data
 
     else:
-        return get_feats(wav_path, X)
+        return get_feats(wav_path, type_of_spec, X)
 
 
 
 class LoadAttackData_ResNet(Dataset):
-    def __init__(self, list_IDs, labels, win_len, config):
+    def __init__(self, list_IDs, labels, win_len, config, type_of_spec):
         """
         self.list_IDs	: list of strings (each string: utt key),
         self.labels      : dictionary (key: utt key, value: label integer)
@@ -227,6 +227,7 @@ class LoadAttackData_ResNet(Dataset):
         self.labels = labels
         self.win_len = win_len
         self.config = config
+        self.type_of_spec = type_of_spec
 
     def __len__(self):
         return len(self.list_IDs)
@@ -235,7 +236,13 @@ class LoadAttackData_ResNet(Dataset):
         track = self.list_IDs[index]  # path to cached spectrogram
         y = self.labels[track]   # get the corresponding GT label
 
-        X = get_features(track, self.config['features'], self.config, X=None, cached=True)
+        X = get_features(wav_path=track,
+                         features=self.config['features'],
+                         args=self.config,
+                         type_of_spec=self.type_of_spec,
+                         X=None,
+                         cached=False,
+                         force=False)
 
         feature_len = X.shape[1]
 

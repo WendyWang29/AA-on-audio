@@ -148,5 +148,6 @@ if __name__ == '__main__':
     epsilon: values like 1.0, 2.0....
     '''
     type_of_spec = 'mag'
+
     init_eval(config_res, type_of_spec=type_of_spec, attack=None, at_model=None, epsilon=None)
     #init_eval(config_res, type_of_spec=type_of_spec, attack='FGSM', at_model='SENet', epsilon=3.0)

@@ -13,12 +13,14 @@ import time
 from attacks.sp_utils import spectrogram_inversion_batch
 from attacks_utils import save_perturbed_audio
 
-def prepare_dataloader(attack, epsilon, config, df_eval):
+def prepare_dataloader(attack, epsilon, config, df_eval, type_of_spec):
     # create the folder for the perturbed dataset
     epsilon_str = str(epsilon).replace('.', 'dot')
-    audio_folder = f'{attack}_ResNet_dataset_{epsilon_str}'
+    #audio_folder = f'{attack}_ResNet_dataset_{epsilon_str}'
+    audio_folder = f'{attack}_{epsilon_str}_dataset'
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    audio_folder = os.path.join(current_dir, f'{attack}_ResNet', audio_folder)
+    #audio_folder = os.path.join(current_dir, f'{attack}_ResNet', audio_folder)
+    audio_folder = os.path.join(current_dir, 'Ensemble', audio_folder)
     os.makedirs(audio_folder, exist_ok=True)
     print(f'Saving the perturbed audio in {audio_folder}')
     print(f'\n{attack} attack on ResNet starts...\n')
@@ -30,7 +32,8 @@ def prepare_dataloader(attack, epsilon, config, df_eval):
     feat_set = LoadAttackData_ResNet(list_IDs=file_eval,
                                      labels=labels_eval,
                                      win_len=config['win_len'],
-                                     config=config)
+                                     config=config,
+                                     type_of_spec=type_of_spec)
     data_loader = DataLoader(feat_set,
                              batch_size=config['eval_batch_size'],
                              shuffle=False,
