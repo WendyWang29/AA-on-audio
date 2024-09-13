@@ -38,13 +38,14 @@ def EnsembleV1_dataset(epsilon, eval_path, device, ResNet_model, SENet_model, co
     :param type_of_spec: string
     :return:
     """
-    q_res = 70
-    q_sen = 90
+    q_res = 10
+    q_sen = 10
 
     # ENSEMBLE ATTACK ON EVAL DATASET OF AUDIO WHICH IS LONGER THAN 3S
 
     eval_path = '../data/df_eval_19_3s.csv'
     df_eval = pd.read_csv(eval_path)
+    print(f'The dataset contains {len(df_eval)} samples\n')
 
     data_loader, file_eval, audio_folder = prepare_dataloader(attack=f'QUANT_ENS_{q_res}_{q_sen}',
                                                               epsilon=epsilon,
@@ -113,7 +114,7 @@ def EnsembleV1_dataset(epsilon, eval_path, device, ResNet_model, SENet_model, co
         '''
         pert_batch = batch_x + epsilon * grad.sign()
 
-        del batch_x, batch_z, grad_res, grad_sen, abs_grad_res, abs_grad_sen
+        del batch_x, batch_z, grad_res, grad_sen, abs_grad_res, abs_grad_sen, grad, matrix
         '''
         compute the effectiveness
         '''
@@ -154,13 +155,15 @@ def EnsembleV1_dataset(epsilon, eval_path, device, ResNet_model, SENet_model, co
                                  sr=16000,
                                  epsilon=epsilon,
                                  attack=f'QUANT_ENS_{q_res}_{q_sen}')
+            del audio, sliced_spec
         del pert_batch
         tqdm.write(f'Effectiveness ResNet: {effect_perc_res:.2f}% | avg.effectiveness ResNet: {avg_res:.2f} \n'
-                   f'Effectiveness SENet: {effect_perc_sen:.2f}% | avg.effectiveness ResNet: {avg_sen:.2f}')
+                   f'Effectiveness SENet: {effect_perc_sen:.2f}% | avg.effectiveness SENet: {avg_sen:.2f}\n'
+                   f'-------')
         torch.cuda.empty_cache()
         gc.collect()
 
-        print('oop')
+
 
 
 if __name__ == '__main__':

@@ -198,9 +198,9 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, type_of
               f'--> Predicted label: {predicted_label}, \n{out}\n'
               f'--> Confidence: {compute_confidence(out):.2f} %')
 
-    elif attack == 'QUANT_ENS_90_70' and attack_model == None:
-        folder = os.path.join('Ensemble', f'QUANT_ENS_90_70_{epsilon_str}')
-        pert_file = f'QUANT_ENS_90_70_{epsilon_str}_{file_number}.flac'
+    elif attack != None and attack_model == None:
+        folder = os.path.join('Ensemble', f'{attack}_{epsilon_str}')
+        pert_file = f'{attack}_{epsilon_str}_{file_number}.flac'
         file_path = os.path.join(folder, pert_file)
 
         original_audio, _ = get_original_audio(file_number)
@@ -218,7 +218,7 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, type_of
 
         print(f'--> File name: {pert_file}\n'
               f'--> Model evaluated: {string}\n'
-              f'--> Attack: QUANT_ENS 90 70\n'
+              f'--> Attack: {attack}\n'
               f'--> GT label: {GT_label}\n',
               f'--> Predicted label: {predicted_label}, \n{out}\n'
               f'--> Confidence: {compute_confidence(out):.2f} %')

@@ -13,6 +13,7 @@ from src.utils import *
 import os
 import sys
 import librosa
+import librosa.feature
 import soundfile as sf
 from tqdm import tqdm
 from src.resnet_model import SpectrogramModel
@@ -47,21 +48,17 @@ def get_grad(model, model_name, L, batch, y):
     grad = batch.grad.data
     return grad, out
 
-
 def grad_average(grad1, grad2):
     grad_avg = (grad1 + grad2) / 2
     return grad_avg
-
 
 def normalize(tensor):
     mean = tensor.mean()
     std = tensor.std()
     return (tensor - mean) / std, mean, std
 
-
 def denormalize(tensor, mean, std):
     return tensor * std + mean
-
 
 def method_2(grad1, grad2):
     norm1, mean1, std1 = normalize(grad1)
@@ -93,7 +90,6 @@ def method_2(grad1, grad2):
 
     return fused
 
-
 def model_pred_batch(model, model_name, batch):
     if model_name == 'SENet':
         out = model(batch.unsqueeze(dim=1))
@@ -102,9 +98,9 @@ def model_pred_batch(model, model_name, batch):
     label = torch.argmax(out, dim=1)
     return out, label
 
-
-def plot_gaussian_distr(tensor):
+def plot_gaussian_distr_with_perc(tensor, model, q, perc):
     tensor = tensor.clone().detach().cpu()
+    perc = perc.clone().detach().cpu()
 
     # Flatten the tensor
     flattened_data = tensor.flatten()
@@ -119,34 +115,35 @@ def plot_gaussian_distr(tensor):
     plt.hist(flattened_data, bins=100, density=True, alpha=0.6, color='g', edgecolor='black')
 
     # Plot the Gaussian fit
-    xmin, xmax = plt.xlim()
-    x = np.linspace(xmin, xmax, 100)
-    p = stats.norm.pdf(x, mu, std)
-    plt.plot(x, p, 'k', linewidth=2)
+    # xmin, xmax = plt.xlim()
+    # x = np.linspace(xmin, xmax, 100)
+    # p = stats.norm.pdf(x, mu, std)
+    # plt.plot(x, p, 'k', linewidth=2)
+
+    # percentile vertical line
+    plt.axvline(perc, color='r', linestyle='--', linewidth=2, label=f'{q}th Percentile')
 
     # Add labels and title
     plt.xlabel('Value')
     plt.ylabel('Density')
-    plt.title('Gaussian Distribution Fit')
+    plt.title(f'Gaussian Distribution Fit for {model}')
+    plt.legend()
     plt.show()
 
+def compute_silence_percentage(y, silence_thresh=0.02, frame_length=2048, hop_length=512):
+    # Compute the Root Mean Square (RMS) energy of the audio signal
+    rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
 
-def plot_3d_grad(grad, model):
-    x = np.arange(grad.shape[1])
-    y = np.arange(grad.shape[0])
-    X, Y = np.meshgrid(x, y)
+    # Normalize the RMS values between 0 and 1
+    rms_normalized = rms / np.max(rms)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    # Detect silence (RMS values below the silence threshold)
+    silence_mask = rms_normalized < silence_thresh
 
-    ax.plot_surface(X, Y, grad, cmap='viridis')
+    # Calculate the percentage of silent frames
+    silence_percentage = np.sum(silence_mask) / len(silence_mask) * 100
 
-    ax.set_xlabel('Y axis')
-    ax.set_ylabel('X axis')
-    ax.set_zlabel('Z axis')
-    plt.title(f'{model} gradient')
-    plt.show()
-
+    return silence_percentage
 
 def Ensemble_Attack_SingleFile(file_number,
                                epsilon,
@@ -196,13 +193,9 @@ def Ensemble_Attack_SingleFile(file_number,
     # SENet grad computation
     grad_sen, out_sen = get_grad(model=SENet_model, model_name='SENet', L=L, batch=batch_z, y=batch_y)
 
-    plot_2d_grad(grad_res, 'ResNet')
-    plot_2d_grad(grad_sen, 'SENet')
+    #plot_2d_grad(grad_res, 'ResNet')
+    #plot_2d_grad(grad_sen, 'SENet')
 
-    # plot_2d_grad(grad_res, 'ResNet')
-    # plot_2d_grad(grad_sen, 'SENet')
-    # plot_gaussian_distr(grad_res)
-    # plot_gaussian_distr(grad_sen)
 
     if method == 1:
         '''
@@ -351,10 +344,14 @@ def Ensemble_Attack_SingleFile(file_number,
         abs_grad_sen = torch.abs(grad_sen)
 
         # determine the thresholds
-        q_res = 90
+        q_res = 70
         q_sen = 70
         thresh_res = torch.quantile(abs_grad_res, q_res / 100)
         thresh_sen = torch.quantile(abs_grad_sen, q_sen / 100)
+
+        # plot the distribution and percentile
+        #(tensor=abs_grad_res, model='ResNet', q=q_res, perc=thresh_res)
+        #plot_gaussian_distr_with_perc(tensor=abs_grad_sen, model='SENet', q=q_sen, perc=thresh_sen)
 
         # create new matrix initiated with infinity
         matrix = torch.full_like(grad_res, float('inf'))
@@ -370,13 +367,13 @@ def Ensemble_Attack_SingleFile(file_number,
         matrix[matrix == float('inf')] = 0
 
         grad = matrix
-        plot_2d_grad(grad, 'Percentile gradient')
+        #plot_2d_grad(grad, 'Percentile gradient')
 
         pert_batch = batch_x + epsilon * grad.sign()
 
         p_pred_res, p_label_res = model_pred_batch(ResNet_model, 'ResNet', pert_batch)
         p_pred_sen, p_label_sen = model_pred_batch(SENet_model, 'SENet', pert_batch)
-        print(f'\nPercentile grad attack\n'
+        print(f'\nPercentile grad attack {q_res} {q_sen}\n'
               f'---> File number: {file_number}\n',
               f'--> GT label: {GT_label}\n',
               f'--> Predicted label ResNet: {p_label_res.item()} --- Confidence: {compute_confidence(p_pred_res):.2f} % --- {p_pred_res.tolist()}\n',
@@ -395,6 +392,10 @@ def Ensemble_Attack_SingleFile(file_number,
             phase = phase[:, :84]
 
         p_audio = librosa.istft(mag_spec * np.exp(1j * phase), n_fft=2048, hop_length=512)
+
+        # silence %
+        silence_percentage = compute_silence_percentage(p_audio)
+        print(f'Silence: {silence_percentage:.2f}%')
 
         epsilon_str = str(epsilon).replace('.', 'dot')
         folder = 'Ensemble'
@@ -452,8 +453,8 @@ if __name__ == '__main__':
 
     eval_path = os.path.join('..', config_SENet['df_eval_path'])  # eval dataset of ASVSpoof2019
 
-    epsilon = 1.0
-    file_number = 1425990
+    epsilon = 3.0
+    file_number = 1248929
     method = 5
 
     print(f'Epsilon: {epsilon}, method: {method}\n')

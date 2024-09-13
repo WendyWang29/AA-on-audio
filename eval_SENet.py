@@ -101,17 +101,81 @@ def SENet_eval(model, save_path, config, device, attack, at_model, epsilon=None,
         print('Scores saved to {}'.format(save_path))
 
 
-def init_eval(config, attack=None, at_model=None, epsilon=None):
+def SENet_eval_ensemble(model, save_path, config, device, type_of_spec, epsilon=None, df_eval=None):
+    epsilon_dot_notation = str(epsilon).replace('.', 'dot')
+
+    # folder in which the perturbed audio files are located + create a list of the files
+    flac_directory = os.path.join('attacks', 'Ensemble', f'QUANT_ENS_10_10_{epsilon_dot_notation}_dataset')
+    csv_location = os.path.join('eval', f'flac_Ensemble_10_10_{epsilon_dot_notation}.csv')
+
+    if os.path.exists(csv_location):
+        os.remove(csv_location)
+        print(f"Existing file '{csv_location}' has been removed.")
+
+        # create list of flac files
+    flac_files = [f for f in os.listdir(flac_directory) if f.endswith('.flac')]
+
+    # create and write the csv file
+    with open(csv_location, 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        # write the header
+        csvwriter.writerow(['path'])
+        # write the data rows
+        for index, filename in enumerate(flac_files):
+            csvwriter.writerow([os.path.join(flac_directory, filename)])
+
+    # csv file done
+    df_eval = pd.read_csv(csv_location)
+    file_eval = list(df_eval['path'])
+
+    if os.path.exists(save_path):
+        print(f'save_path exists, removing it to create a new one')
+        os.system(f'rm {save_path}')
+
+    '''
+    using the same data loaders of ResNet
+    '''
+
+    feat_set = LoadEvalData_ResNet(list_IDs=file_eval, win_len=config['win_len'], config=config,
+                                   type_of_spec=type_of_spec)
+    feat_loader = DataLoader(feat_set, batch_size=config['eval_batch_size'], shuffle=False, num_workers=15)
+
+    model.eval()
+
+    with torch.no_grad():
+
+        for feat_batch, utt_id in tqdm(feat_loader, total=len(feat_loader)):
+            # fname_list = []
+            # score_list = []
+            feat_batch = feat_batch.to(torch.float32).to(device)
+            score = model(feat_batch.unsqueeze(dim=1))
+            probabilities = torch.exp(score)
+            probabilities = probabilities.detach().cpu().numpy()
+
+            with open(save_path, mode='a+', newline='') as file:
+                writer = csv.writer(file)
+                if file.tell() == 0:
+                    writer.writerow(['Filename', 'Pred.class 0', 'Pred.class 1'])
+                for i in range(len(utt_id)):
+                    row = [utt_id[i], probabilities[i, 0], probabilities[i, 1]]
+                    writer.writerow(row)
+        print('Scores saved to {}'.format(save_path))
+
+def init_eval(config, type_of_spec, attack=None, at_model=None, epsilon=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     SENet_model = se_resnet34_custom(num_classes=2).to(device)
-    SENet_model.load_state_dict(torch.load(config['model_path_spec'], map_location=device), strict=False)
+
+    if type_of_spec == 'mag':
+        SENet_model.load_state_dict(torch.load(config['model_path_spec_mag'], map_location=device), strict=False)
+    elif type_of_spec == 'pow':
+        SENet_model.load_state_dict(torch.load(config['model_path_spec_pow'], map_location=device), strict=False)
 
     print("Number of layers:", len(list(SENet_model.modules())))
     total_params = sum(p.numel() for p in SENet_model.parameters())
     print("Total number of parameters:", total_params)
 
-    if attack:
+    if attack and attack != 'Ensemble':
         # perform the evaluation on the dataset attacked with FGSM on ResNet and a certain epsilon value
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = f'./eval/prob_SENet_{attack}_{at_model}_{epsilon_str}.csv'
@@ -120,11 +184,26 @@ def init_eval(config, attack=None, at_model=None, epsilon=None):
     elif attack == None:
         # perform the evaluation on the clean dataset ASVSpoof2019
         df_eval = pd.read_csv(config['df_eval_path'])
-        save_path = './eval/prob_SENet_spec_eval_mag.csv'
+        if type_of_spec == 'mag':
+            save_path = './eval/prob_SENet_spec_eval_mag.csv'
+        elif type_of_spec == 'pow':
+            save_path = './eval/prob_SENet_spec_eval.csv'
+
         SENet_eval(SENet_model, save_path, config, device, attack, at_model, df_eval=df_eval, epsilon=None)
 
+    elif attack == 'Ensemble':
+
+        epsilon_str = str(epsilon).replace('.', 'dot')
+
+        if type_of_spec == 'mag':
+            save_path = f'./eval/prob_SENet_Ensemble_10_10_{epsilon_str}_mag.csv'
+        elif type_of_spec == 'pow':
+            save_path = f'./eval/prob_SENet_Ensemble_10_10_{epsilon_str}.csv'
+
+        SENet_eval_ensemble(SENet_model, save_path, config, device, type_of_spec, epsilon, df_eval=None)
+
     else:
-        print('Attack should be <ResNet FGSM>, <SENet FGSM> or None')
+        print('wrong attack...')
 
 
 if __name__ == '__main__':
@@ -132,7 +211,7 @@ if __name__ == '__main__':
     set_gpu(-1)
 
     config_path = 'config/SENet.yaml'
-    config_res = read_yaml(config_path)
+    config_sen = read_yaml(config_path)
 
     '''
     attack: 'FGSM'
@@ -140,5 +219,8 @@ if __name__ == '__main__':
     epsilon: values like 1.0, 2.0....
     '''
 
-    init_eval(config_res, attack=None, at_model=None, epsilon=None)
+    type_of_spec = 'pow'
+
+    init_eval(config_sen, type_of_spec=type_of_spec, attack='Ensemble', at_model=None, epsilon=3.0)
+    #init_eval(config_res, attack=None, at_model=None, epsilon=None)
     #init_eval(config_res, attack='FGSM', at_model='LCNN', epsilon=2.0)

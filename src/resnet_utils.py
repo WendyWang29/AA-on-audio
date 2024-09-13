@@ -323,7 +323,14 @@ class LoadEvalData_ResNet(Dataset):
 
     def __getitem__(self, index):
         track = self.list_IDs[index]
-        X = get_features(track, self.config['features'], self.config, self.type_of_spec, X=None, cached=True)
+        X = get_features(wav_path=track,
+                         features=self.config['features'],
+                         args=self.config,
+                         type_of_spec=self.type_of_spec,
+                         X=None,
+                         cached=False,
+                         force=False)
+
         #X = get_features_1(track)
 
         feature_len = X.shape[1]

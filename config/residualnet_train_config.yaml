@@ -7,7 +7,7 @@ save_trained_name: 'best_model_ASVSpoof2019.pth'
 model_folder_pow: 'checkpoints/residualnet_model'
 model_folder_mag: 'checkpoints/residualnet_model_mag'
 
-batch_size: 64 #128
+batch_size:  64 #128
 num_epochs: 100
 early_stopping: 10
 lr: 0.00001
@@ -22,7 +22,7 @@ spec_features: 'data/features/spec'
 
 df_train_path: 'data/df_train.csv'
 df_dev_path: 'data/df_dev.csv'
-df_eval_path: 'data/df_eval_19.csv' #'data/df_eval.csv'
+df_eval_path:  'data/df_eval_19.csv' #'data/df_eval.csv'
 df_eval_path_3s: 'data/df_eval_19_3s.csv'
 df_aug_path: 'data/df_aug.csv'
 
@@ -30,7 +30,7 @@ fsamp: 16000
 win_len: 3
 hop_size: 3
 
-eval_batch_size: 64 #128
+eval_batch_size: 32 #64 #128
 model_path_spec_pow: 'checkpoints/residualnet_model/model_spec_100_64_1e-05/best_model_ASVSpoof2019.pth'
 model_path_spec_mag: 'checkpoints/residualnet_model_mag/model_spec_100_64_1e-05_mag/best_model_ASVSpoof2019.pth'
 

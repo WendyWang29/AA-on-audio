@@ -23,7 +23,7 @@ def prepare_dataloader(attack, epsilon, config, df_eval, type_of_spec):
     audio_folder = os.path.join(current_dir, 'Ensemble', audio_folder)
     os.makedirs(audio_folder, exist_ok=True)
     print(f'Saving the perturbed audio in {audio_folder}')
-    print(f'\n{attack} attack on ResNet starts...\n')
+
 
     # data loader
     file_eval = list(df_eval['path'])
