@@ -233,16 +233,7 @@ def save_perturbed_audio(file, folder, audio, sr, attack, epsilon=None):
     sf.write(file_path, audio, sr, format='FLAC')
     #print(f'Saved the perturbed audio as: {file_path}')
 
-def save_perturbed_spec(file, folder, spec, epsilon, attack):
-    '''
-    Save the perturbed spec in the appropriate folder
-    :param file: the file path to the flac file (to extract file name)
-    :param folder: path to the folder in which file is to be saved
-    :param spec: perturbed spectrogram to be saved as .npy file
-    :param epsilon: epsilon used for the attack
-    :param attack: name of the attack
-    :return: None
-    '''
+def save_perturbed_spec(file, folder, spec, attack, epsilon):
 
     epsilon_str = str(epsilon).replace('.', 'dot')
 

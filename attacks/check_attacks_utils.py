@@ -199,8 +199,8 @@ def check_attack(eval_model, attack_model, attack, file_number, epsilon, type_of
               f'--> Confidence: {compute_confidence(out):.2f} %')
 
     elif attack != None and attack_model == None:
-        folder = os.path.join('Ensemble', f'{attack}_{epsilon_str}')
-        pert_file = f'{attack}_{epsilon_str}_{file_number}.flac'
+        folder = os.path.join('Ensemble', f'{attack}_{epsilon_str}_dataset')
+        pert_file = f'{attack}_LA_E_{file_number}_{epsilon_str}.flac'
         file_path = os.path.join(folder, pert_file)
 
         original_audio, _ = get_original_audio(file_number)

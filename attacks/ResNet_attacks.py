@@ -11,16 +11,30 @@ import torch.nn as nn
 import librosa
 import time
 from attacks.sp_utils import spectrogram_inversion_batch
-from attacks_utils import save_perturbed_audio
+from attacks_utils import save_perturbed_audio, save_perturbed_spec
+
+
+
 
 def prepare_dataloader(attack, epsilon, config, df_eval, type_of_spec):
     # create the folder for the perturbed dataset
     epsilon_str = str(epsilon).replace('.', 'dot')
-    #audio_folder = f'{attack}_ResNet_dataset_{epsilon_str}'
-    audio_folder = f'{attack}_{epsilon_str}_dataset'
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    #audio_folder = os.path.join(current_dir, f'{attack}_ResNet', audio_folder)
-    audio_folder = os.path.join(current_dir, 'Ensemble', audio_folder)
+
+    if attack == 'FGSM':
+        audio_folder = f'{attack}_ResNet_dataset_{epsilon_str}'
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        audio_folder = os.path.join(current_dir, f'{attack}_ResNet', audio_folder)
+    elif attack == 'FGSM_3s':
+        audio_folder = f'FGSM_ResNet_3s_dataset_{epsilon_str}'
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        audio_folder = os.path.join(current_dir, f'{attack}_ResNet', audio_folder)
+    elif attack == 'QUANT_ENS':
+        audio_folder = f'{attack}_{epsilon_str}_dataset'
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        audio_folder = os.path.join(current_dir, 'Ensemble', audio_folder)
+    else:
+        print('Wrong attack')
+
     os.makedirs(audio_folder, exist_ok=True)
     print(f'Saving the perturbed audio in {audio_folder}')
 
@@ -209,15 +223,14 @@ def FGSM_UNCUT_ResNet(epsilon, config, model, df_eval, device):
         time_taken = time.time() - start_time
         tqdm.write(f'Time taken: {time_taken} | effectiveness: {effectiveness_percentage:.2f}% ')
 
+def FGSM_ResNet(epsilon, config, model, df_eval, attack, device):
 
-def FGSM_ResNet(epsilon, config, model, df_eval, device):
-    attack = 'FGSM'
-    data_loader, file_eval, audio_folder = prepare_dataloader(attack, epsilon, config, df_eval)
+    data_loader, file_eval, audio_folder = prepare_dataloader(attack, epsilon, config, df_eval, type_of_spec='pow')
 
     L = nn.NLLLoss()
 
     print('The attack starts...\n')
-    effect = []  # for storing the unbalanced effectiveness
+    effect = []  # for storing the unbalanced effectiveness on Resnet
 
     # ATTACK
     # attack loader returns [X_win, y, time_frames, index]
@@ -237,7 +250,7 @@ def FGSM_ResNet(epsilon, config, model, df_eval, device):
 
         del batch_x, grad
 
-        # effectiveness of the attack
+        # effectiveness of the attack on ResNet
         perturbed_batch_out = model(perturbed_batch)
         predicted_labels = torch.argmax(perturbed_batch_out, dim=1)
         wrong_predictions = (predicted_labels != batch_y)
@@ -256,17 +269,35 @@ def FGSM_ResNet(epsilon, config, model, df_eval, device):
             # working on each row of the matrix of perturbed specs
             sliced_spec = perturbed_batch[i][:, :time_frames[i]]
 
+            # path for saving the spectrogram
+            # epsilon_str = str(epsilon).replace('.', 'dot')
+            # audio_folder = f'{attack}_ResNet_dataset_{epsilon_str}'
+            # current_dir = os.path.dirname(os.path.abspath(__file__))
+            # spec_folder = os.path.join(current_dir, f'{attack}_ResNet', audio_folder, 'specs')
+
+            # spectrogram inversion
             audio, _ = spectrogram_inversion_batch(config=config,
                                                    index=index[i],
                                                    spec=sliced_spec,
                                                    phase_info=True)
 
-            save_perturbed_audio(file=file_eval[index[i]],
-                                 folder=audio_folder,
-                                 audio=audio,
-                                 sr=16000,
-                                 epsilon=epsilon,
-                                 attack='FGSM_ResNet')
+            if attack == 'FGSM':
+                save_perturbed_audio(file=file_eval[index[i]],
+                                     folder=audio_folder,
+                                     audio=audio,
+                                     sr=16000,
+                                     epsilon=epsilon,
+                                     attack='FGSM_ResNet')
+
+            elif attack == 'FGSM_3s':
+                save_perturbed_audio(file=file_eval[index[i]],
+                                     folder=audio_folder,
+                                     audio=audio,
+                                     sr=16000,
+                                     epsilon=epsilon,
+                                     attack='FGSM_ResNet_3s')
+
+
         del perturbed_batch
 
         time_taken = time.time() - start_time
@@ -283,13 +314,21 @@ if __name__ == '__main__':
     config_path = '../config/residualnet_train_config.yaml'
     config = read_yaml(config_path)
 
-    df_eval = pd.read_csv(os.path.join('..', config['df_eval_path']))
+    attack = 'FGSM_3s'   #'FGSM'
+
+    if attack == 'FGSM':
+        # load the entire ASVSpoof2019 eval dataset
+        df_eval = pd.read_csv(os.path.join('..', config['df_eval_path']))
+    elif attack == 'FGSM_3s':
+        # load the reduced dataset containing only audio >3s
+        df_eval = pd.read_csv(os.path.join('..', config['df_eval_path_3s']))
+
 
     model = SpectrogramModel().to(device)
-    model.load_state_dict(torch.load(os.path.join('..', config['model_path_spec']), map_location=device), strict=False)
+    model.load_state_dict(torch.load(os.path.join('..', config['model_path_spec_pow']), map_location=device), strict=False)
     model.eval()
     print('Model loaded\n')
 
-    epsilon = 4.0
+    epsilon = 3.0
 
-    FGSM_ResNet(epsilon, config, model, df_eval, device)
+    FGSM_ResNet(epsilon, config, model, df_eval, attack, device)

@@ -347,6 +347,29 @@ class LoadEvalData_ResNet(Dataset):
         return X_win, track
 
 
+class LoadEvalData_ResNet_SPEC(Dataset):
+    def __init__(self, list_IDs, win_len, config, type_of_spec):
+
+        self.list_IDs = list_IDs
+        self.win_len = win_len
+        self.config = config
+        self.type_of_spec = type_of_spec
+
+    def __len__(self):
+        return len(self.list_IDs)
+
+    def __getitem__(self, index):
+        path = self.list_IDs[index]
+
+        spec = np.load(path)
+
+        if spec.shape[1] != 84:
+            print(f'oops at index {index}\n')
+            sys.exit()
+
+        return spec, path
+
+
 # def eval():
 #
 #     set_gpu(-1)
