@@ -65,7 +65,7 @@ def FGSM_SENet_3s(epsilon, config, model, df_eval, device):
         del batch_x, grad
 
         # effectiveness of the attack on ResNet
-        perturbed_batch_out = model(perturbed_batch)
+        perturbed_batch_out = model(perturbed_batch.unsqueeze(dim=1))
         predicted_labels = torch.argmax(perturbed_batch_out, dim=1)
         wrong_predictions = (predicted_labels != batch_y)
         effectiveness = wrong_predictions.float().mean()
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     set_gpu(-1)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    config_path = 'config/SENet.yaml'
+    config_path = '../config/SENet.yaml'
     config = read_yaml(config_path)
 
     attack = 'FGSM_3s'
