@@ -385,7 +385,7 @@ if __name__ == '__main__':
     config_sen = read_yaml(config_path)
 
     type_of_spec = 'pow'
-    epsilon = 3.0
+    epsilon = 0.0
     attack_model = 'ResNet'
     attack = 'FGSM'
     dataset = '3s'

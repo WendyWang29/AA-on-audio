@@ -1,7 +1,7 @@
 features: 'spec'
 
 save_trained_name: 'best_model_ASVSpoof2019.pth'
-model_folder: 'checkpoints/LCNN_model'
+model_folder_pow: 'checkpoints/LCNN_model'
 
 batch_size: 64
 num_epochs: 100
@@ -17,10 +17,11 @@ spec_features: 'data/features/spec'
 df_train_path: 'data/df_train.csv'
 df_dev_path: 'data/df_dev.csv'
 df_eval_path: 'data/df_eval_19.csv'
+df_eval_path_3s: 'data/df_eval_19_3s.csv'
 
 fsamp: 16000
 win_len: 3
 hop_size: 3
 
-eval_batch_size: 64
-model_path_spec: 'checkpoints/LCNN_model/model_spec_100_64_1e-05/best_model_ASVSpoof2019.pth'
+eval_batch_size: 32 #64
+model_path_spec_pow: 'checkpoints/LCNN_model/model_spec_100_64_1e-05/best_model_ASVSpoof2019.pth'

@@ -479,11 +479,11 @@ if __name__ == '__main__':
 
 
     type_of_spec = 'pow'
-    epsilon = 3.0
-    attack_model = 'SENet'
+    epsilon = 0.0
+    attack_model = 'ResNet'
     attack = 'FGSM'
     dataset = '3s'
-    feature = 'spec' #'audio' or 'spec'
+    feature = 'audio' #'audio' or 'spec'
     q_res = None
     q_sen = None
 

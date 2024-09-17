@@ -24,7 +24,6 @@ def compute_spectrum(x, type_of_spec):
         feat = a
     elif type_of_spec == 'pow':
         s = librosa.core.stft(x, n_fft=2048, win_length=2048, hop_length=512, center=False)
-        a = np.abs(s)
         a = np.abs(s) ** 2
         feat = librosa.power_to_db(a)
     else:
