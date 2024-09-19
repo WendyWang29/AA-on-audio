@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torchaudio.transforms as T
 
 
 class ResNetBlock(nn.Module):
@@ -106,7 +107,12 @@ class SpectrogramModel(nn.Module):
         self.fc1 = nn.Linear(64, 128)
         self.fc2 = nn.Linear(128, 2)
 
+        #self.stft = T.Spectrogram(n_fft=2048, win_length=2048, hop_length=512, power=2)
+
     def forward(self, x):
+
+        #x = self.stft(x).unsqueeze(dim=0)
+
         batch_size = x.size(0)
         x = x.unsqueeze(dim=1)
         out = self.conv1(x)

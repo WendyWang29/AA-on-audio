@@ -2,6 +2,7 @@ import logging
 
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('tensorflow').setLevel(logging.WARNING)
+logging.getLogger('numba').setLevel(logging.WARNING)
 
 logger = logging.getLogger("add_challenge")
 logger.setLevel(logging.INFO)
@@ -22,10 +23,10 @@ def main(config, type_of_spec):
     assert config['features'] in ['spec', 'mfcc'], 'Not supported feature'
 
     if type_of_spec == 'pow':
-        model_tag = 'model_{}_{}_{}_{}'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+        model_tag = 'model_{}_{}_{}_{}_v0'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
         model_save_path = os.path.join(config['model_folder_pow'], model_tag)
     elif type_of_spec == 'mag':
-        model_tag = 'model_{}_{}_{}_{}_mag'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+        model_tag = 'model_{}_{}_{}_{}_mag_v0'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
         model_save_path = os.path.join(config['model_folder_mag'], model_tag)
     else:
         print('You need to choose what kind of spectrogram you want to work with between power and mag')
@@ -59,6 +60,9 @@ def main(config, type_of_spec):
     dev_loader = DataLoader(dev_set, batch_size=config['batch_size'], shuffle=True, num_workers=15)
     del dev_set, d_label_dev
 
+    temp_path = os.path.join(model_save_path, config['save_trained_name'])
+    print(f'The model checkpoint will be saved at {temp_path}\n')
+
     writer = SummaryWriter('logs/{}'.format(model_tag))
     best_acc = 0
     best_loss = 1
@@ -89,7 +93,7 @@ def main(config, type_of_spec):
 if __name__ == '__main__':
 
     seed_everything(1234)
-    set_gpu(-1)
+    set_gpu(-5)
 
     config_path = 'config/residualnet_train_config.yaml'
     config_res = read_yaml(config_path)

@@ -8,6 +8,8 @@ warnings.filterwarnings("ignore")
 def read_audio(audio_path, dur=180, fs=16000, trim=False, int_type=False, windowing=False):
 
     X, fs_orig = librosa.load(audio_path, sr=None, duration=dur)
+    X = X[:47104]
+
     if fs_orig != fs:
         X = librosa.resample(X, fs_orig, fs)
 

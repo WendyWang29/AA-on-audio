@@ -19,20 +19,20 @@ def window_stack(a, stepsize=int(0.5*16000), width=int(1*16000)):
 
 def compute_spectrum(x, type_of_spec):
     if type_of_spec == 'mag':
-        s = librosa.core.stft(x, n_fft=2048, win_length=2048, hop_length=512, center=False)
+        s = librosa.stft(x, n_fft=2048, win_length=2048, hop_length=512, window='hann', center=True)
         a = np.abs(s)
         feat = a
     elif type_of_spec == 'pow':
-        s = librosa.core.stft(x, n_fft=2048, win_length=2048, hop_length=512, center=False)
+        s = librosa.stft(x, n_fft=2048, win_length=2048, hop_length=512, window='hann', center=True)
         a = np.abs(s) ** 2
-        feat = librosa.power_to_db(a)
+        feat = librosa.power_to_db(a, ref=np.max)
     else:
         sys.exit(f'{type_of_spec} is a wrong type of spectrogram')
 
     return feat
 
 
-def get_log_spectrum(wav_path, type_of_spec, X, fs, win_len=None, hop_size=None):
+def get_log_spectrum(type_of_spec, X, fs, win_len=None, hop_size=None):
     if win_len:
         X = window_stack(X, stepsize=int(hop_size*fs), width=int(win_len*fs)).T
 

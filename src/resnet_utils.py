@@ -165,7 +165,7 @@ def get_loss_resnet(data_loader, model, device):
 #     return data
 
 
-def get_features(wav_path, features, args, type_of_spec, X, cached=False, force=False):
+def get_features(wav_path, features, args, type_of_spec, cached=False, force=False):
     """
     Extract features chosen by features argument.
 
@@ -178,41 +178,54 @@ def get_features(wav_path, features, args, type_of_spec, X, cached=False, force=
     :return: extracted features
     :rtype np.array
     """
-    def get_feats(wav_path, type_of_spec=type_of_spec, X=X):
 
-        # if X.all() == None:
+    def get_feats(wav_path, type_of_spec=type_of_spec):
+
         X, fs = read_audio(wav_path)
-        args['win_len'] = None
-        args['hop_size'] = None
 
+        net_input_length = 47104
+        feature_len = len(X)
+
+        if feature_len < net_input_length:
+            num_repeats = int(net_input_length/feature_len) + 1
+            X = np.tile(X, num_repeats)
+            X = X[:net_input_length]
+        else:
+            X = X[:net_input_length]
+
+        # after getting the audio of correct length we compute the power spectrogram
         if features == 'spec':
-            return get_log_spectrum(wav_path=wav_path, type_of_spec=type_of_spec, X=X, win_len=args['win_len'], hop_size=args['hop_size'], fs=args['fsamp'])
+            spec = get_log_spectrum(type_of_spec=type_of_spec, X=X, win_len=None, hop_size=args['hop_size'], fs=args['fsamp'])
         elif features == 'mfcc':
-            return compute_mfcc_feats(wav_path, X, args['fsamp'], win_len=args['win_len'], hop_size=args['hop_size'])
+            spec = compute_mfcc_feats(wav_path, X, args['fsamp'], win_len=None, hop_size=args['hop_size'])
         else:
             raise ValueError('Feature type not supported.')
 
-    if cached:
-        cache_dir = args['cache_dir'] + features
+        return spec, feature_len
 
-        if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir)
+#####################################
+    #if cached:
+        # cache_dir = args['cache_dir'] + features
+        #
+        # if not os.path.exists(cache_dir):
+        #     os.makedirs(cache_dir)
+        #
+        # file_name = os.path.join(cache_dir, os.path.splitext(os.path.basename(wav_path))[0] + '.npy')
+        # if not os.path.exists(file_name):# or force:
+        #     data = get_feats(wav_path, X)
+        #     np.save(file_name, data)
+        #     return data
+        # else:
+        #     try:
+        #         data = np.load(file_name, allow_pickle=True)
+        #     except:
+        #         data = get_feats(wav_path, X)
+        #         np.save(file_name, data)
+        #     return data
 
-        file_name = os.path.join(cache_dir, os.path.splitext(os.path.basename(wav_path))[0] + '.npy')
-        if not os.path.exists(file_name):# or force:
-            data = get_feats(wav_path, X)
-            np.save(file_name, data)
-            return data
-        else:
-            try:
-                data = np.load(file_name, allow_pickle=True)
-            except:
-                data = get_feats(wav_path, X)
-                np.save(file_name, data)
-            return data
+    spec, feature_len = get_feats(wav_path, type_of_spec)
 
-    else:
-        return get_feats(wav_path, type_of_spec, X)
+    return spec, feature_len
 
 
 
@@ -233,30 +246,28 @@ class LoadAttackData_ResNet(Dataset):
         return len(self.list_IDs)
 
     def __getitem__(self, index):
-        track = self.list_IDs[index]  # path to cached spectrogram
-        y = self.labels[track]   # get the corresponding GT label
+        track = self.list_IDs[index]  # path to train flac files
+        y = self.labels[track]   # get the corresponding GT labels
 
-        X = get_features(wav_path=track,
-                         features=self.config['features'],
-                         args=self.config,
-                         type_of_spec=self.type_of_spec,
-                         X=None,
-                         cached=False,
-                         force=False)
+        # get_features takes the audio and cuts it to 47104 samples (length is like so for the STFT computations...)
+        X, feature_len = get_features(wav_path=track,
+                                      features=self.config['features'],
+                                      args=self.config,
+                                      type_of_spec=self.type_of_spec,
+                                      cached=False,
+                                      force=False)
 
-        feature_len = X.shape[1]
+        # network_input_shape = 28 * self.win_len
+        #
+        # if feature_len < network_input_shape:
+        #     num_repeats = int(network_input_shape / feature_len) + 1
+        #     X = np.tile(X, (1, num_repeats))
+        #     # feature_len = X.shape[1]
+        #
+        # X_win = X[:, : network_input_shape]
+        # X_win = Tensor(X_win)
 
-        network_input_shape = 28 * self.win_len
-
-        if feature_len < network_input_shape:
-            num_repeats = int(network_input_shape / feature_len) + 1
-            X = np.tile(X, (1, num_repeats))
-            # feature_len = X.shape[1]
-
-        X_win = X[:, : network_input_shape]
-        X_win = Tensor(X_win)
-
-        return X_win, y, feature_len, index
+        return X, y, feature_len, index
 
 
 
@@ -281,29 +292,14 @@ class LoadTrainData_ResNet(Dataset):
     def __getitem__(self, index):
         track = self.list_IDs[index]
         y = self.labels[track]
-        X = get_features(track, self.config['features'], self.config, self.type_of_spec, X=None, cached=True)
+        X, _ = get_features(wav_path=track,
+                                      features=self.config['features'],
+                                      args=self.config,
+                                      type_of_spec=self.type_of_spec,
+                                      cached=False,
+                                      force=False)
 
-        feature_len = X.shape[1]
-        
-        network_input_shape = 28 * self.win_len
-
-        if feature_len < network_input_shape:
-            num_repeats = int(network_input_shape/feature_len) + 1
-            X = np.tile(X, (1, num_repeats))
-            # feature_len = X.shape[1]
-
-        X_win = X[:, : network_input_shape]
-        X_win = Tensor(X_win)
-
-        # last_valid_start_sample = feature_len - network_input_shape
-        # if not last_valid_start_sample == 0:
-        #     start_sample = random.randrange(start=0, stop=last_valid_start_sample)
-        # else:
-        #     start_sample = 0
-        # X_win = X[:, start_sample: start_sample + network_input_shape]
-        # X_win = Tensor(X_win)
-
-        return X_win, y
+        return X, y
 
 
 class LoadEvalData_ResNet(Dataset):
@@ -323,28 +319,26 @@ class LoadEvalData_ResNet(Dataset):
 
     def __getitem__(self, index):
         track = self.list_IDs[index]
-        X = get_features(wav_path=track,
-                         features=self.config['features'],
-                         args=self.config,
-                         type_of_spec=self.type_of_spec,
-                         X=None,
-                         cached=False,
-                         force=False)
+        X, _ = get_features(wav_path=track,
+                            features=self.config['features'],
+                            args=self.config,
+                            type_of_spec=self.type_of_spec,
+                            cached=False,
+                            force=False)
 
         #X = get_features_1(track)
 
-        feature_len = X.shape[1]
+        # network_input_shape = 28 * self.win_len
+        #
+        # if feature_len < network_input_shape:
+        #     num_repeats = int(network_input_shape/feature_len) + 1
+        #     X = np.tile(X, (1, num_repeats))
+        #
+        # X_win = X[:, : network_input_shape]
+        # X_win = Tensor(X_win)
+        # return X_win, track
 
-        network_input_shape = 28 * self.win_len
-
-        if feature_len < network_input_shape:
-            num_repeats = int(network_input_shape/feature_len) + 1
-            X = np.tile(X, (1, num_repeats))
-
-        X_win = X[:, : network_input_shape]
-        X_win = Tensor(X_win)
-
-        return X_win, track
+        return X, track
 
 
 class LoadEvalData_ResNet_SPEC(Dataset):
@@ -370,36 +364,3 @@ class LoadEvalData_ResNet_SPEC(Dataset):
         return spec, path
 
 
-# def eval():
-#
-#     set_gpu(-1)
-#     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-#
-#     seed_everything(1234)
-#
-#     config_path = '../config/residualnet_train_config.yaml'
-#     config_res = read_yaml(config_path)
-#
-#     assert config_res['features'] in ['mfcc', 'spec'], 'Not supported feature'
-#
-#     if config_res['features'] == 'mfcc':
-#         model_cls = MFCCModel
-#     elif config_res['features'] == 'spec':
-#         model_cls = SpectrogramModel
-#
-#     model = model_cls().to(device)
-#
-#     model_path = os.path.join(config_res['model_folder'], config_res['model_path'])
-#     model.load_state_dict(torch.load(model_path))
-#     print('Model loaded : {}'.format(model_path))
-#
-#     df_eval = pd.read_csv(config_res['df_eval_path'], index_col=0)
-#
-#     d_label_eval = dict(zip(df_eval['Path'], df_eval['Bin_label']))
-#     file_eval = list(df_eval['Path'])
-#     eval_set = LoadEvalData(list_IDs=file_eval, labels=d_label_eval, win_len=config_res['win_len'], config=config_res)
-#     eval_loader = DataLoader(eval_set, batch_size=config_res['batch_size'], shuffle=True, num_workers=32)
-#     # del eval_set, d_label_eval
-#
-#     eval_path = os.path.join(config_res['eval_output'], 'prediction_{}.csv'.format(config_res['features']))
-#     produce_evaluation_file(eval_set, model, device, eval_path)
