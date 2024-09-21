@@ -20,7 +20,7 @@ def pad(x, max_len=64000):
     if x_len >= max_len:
         return x[:max_len]
     # need to pad
-    num_repeats = (max_len / x_len)+1
+    num_repeats = (max_len / x_len) + 1
     x_repeat = np.repeat(x, num_repeats)
     padded_x = x_repeat[:max_len]
     return padded_x
@@ -31,7 +31,7 @@ def evaluate_accuracy_resnet(data_loader, model, device):
     num_total = 0.0
     model.eval()
     for batch_x, batch_y in tqdm(data_loader, total=len(data_loader)):
-    # for batch_x, batch_y, batch_meta in data_loader:
+        # for batch_x, batch_y, batch_meta in data_loader:
         batch_size = batch_x.size(0)
         num_total += batch_size
         batch_x = batch_x.to(device)
@@ -48,10 +48,10 @@ def evaluate_metrics(data_loader, model, device):
     num_correct = 0.0
     num_total = 0.0
     roc_auc = np.zeros((data_loader.dataset.__len__(),))
-    eer = np.zeros((data_loader.dataset.__len__()),)
+    eer = np.zeros((data_loader.dataset.__len__()), )
     batch_index = 0
     for batch_x, batch_y in tqdm(data_loader, total=len(data_loader)):
-    # for batch_x, batch_y, batch_meta in data_loader:
+        # for batch_x, batch_y, batch_meta in data_loader:
         batch_size = batch_x.size(0)
         batch_x = batch_x.to(device)
         batch_y = batch_y.view(-1).type(torch.int64).to(device)
@@ -61,7 +61,7 @@ def evaluate_metrics(data_loader, model, device):
             fpr, tpr, _ = roc_curve(batch_y.cpu().detach().numpy(),
                                     torch.exp(batch_out)[:, 1].cpu().detach().numpy())
             roc_auc[batch_index] = roc_auc_score(batch_y.cpu().detach().numpy(),
-                                    torch.exp(batch_out)[:, 1].cpu().detach().numpy())
+                                                 torch.exp(batch_out)[:, 1].cpu().detach().numpy())
             fnr = 1 - tpr
             eer[batch_index] = fpr[np.nanargmin(np.absolute(fnr - fpr))]
         else:
@@ -86,8 +86,9 @@ def produce_evaluation_file(dataset, model, device, save_path):
         batch_score = (batch_out[:, 1] - batch_out[:, 0]
                        ).data.cpu().numpy().ravel()
 
-        pred_dict = {"Path": np.array(list(tracks)), "Bin_label":batch_y.numpy().ravel(), "Prediction": batch_score,
-                     'Pred_0':(batch_out[:, 1]).data.cpu().numpy().ravel(), 'Pred_1':(batch_out[:, 0]).data.cpu().numpy().ravel()}
+        pred_dict = {"Path": np.array(list(tracks)), "Bin_label": batch_y.numpy().ravel(), "Prediction": batch_score,
+                     'Pred_0': (batch_out[:, 1]).data.cpu().numpy().ravel(),
+                     'Pred_1': (batch_out[:, 0]).data.cpu().numpy().ravel()}
         predictions = predictions.append(pd.DataFrame(pred_dict))
 
     predictions.to_csv(save_path)
@@ -107,7 +108,7 @@ def train_epoch_resnet(data_loader, model, lr, device):
     # criterion = nn.NLLLoss()
 
     for batch_x, batch_y in tqdm(data_loader, total=len(data_loader)):
-    # for batch_x, batch_y, batch_meta in data_loader:
+        # for batch_x, batch_y, batch_meta in data_loader:
         batch_size = batch_x.size(0)
         num_total += batch_size
         ii += 1
@@ -115,17 +116,17 @@ def train_epoch_resnet(data_loader, model, lr, device):
         batch_y = batch_y.view(-1).type(torch.int64).to(device)
         batch_out = model(batch_x)
         batch_loss = criterion(batch_out, batch_y)
-        _, batch_pred = batch_out .max(dim=1)
+        _, batch_pred = batch_out.max(dim=1)
         num_correct += (batch_pred == batch_y).sum(dim=0).item()
         running_loss += (batch_loss.item() * batch_size)
         if ii % 10 == 0:
             sys.stdout.write('\r \t {:.2f}'.format(
-                (num_correct/num_total)*100))
+                (num_correct / num_total) * 100))
         optim.zero_grad()
         batch_loss.backward()
         optim.step()
     running_loss /= num_total
-    train_accuracy = (num_correct/num_total)*100
+    train_accuracy = (num_correct / num_total) * 100
     return running_loss, train_accuracy
 
 
@@ -144,7 +145,7 @@ def get_loss_resnet(data_loader, model, device):
         batch_y = batch_y.view(-1).type(torch.int64).to(device)
         batch_out = model(batch_x)
         batch_loss = criterion(batch_out, batch_y)
-        _, batch_pred = batch_out .max(dim=1)
+        _, batch_pred = batch_out.max(dim=1)
         num_correct += (batch_pred == batch_y).sum(dim=0).item()
         running_loss += (batch_loss.item() * batch_size)
     running_loss /= num_total
@@ -181,13 +182,12 @@ def get_features(wav_path, features, args, type_of_spec, cached=False, force=Fal
 
     def get_feats(wav_path, type_of_spec=type_of_spec):
 
-        X, fs = read_audio(wav_path)
+        X, fs, audio_len = read_audio(wav_path)
 
         net_input_length = 47104
-        feature_len = len(X)
 
-        if feature_len < net_input_length:
-            num_repeats = int(net_input_length/feature_len) + 1
+        if audio_len < net_input_length:
+            num_repeats = int(net_input_length / audio_len) + 1
             X = np.tile(X, num_repeats)
             X = X[:net_input_length]
         else:
@@ -195,38 +195,38 @@ def get_features(wav_path, features, args, type_of_spec, cached=False, force=Fal
 
         # after getting the audio of correct length we compute the power spectrogram
         if features == 'spec':
-            spec = get_log_spectrum(type_of_spec=type_of_spec, X=X, win_len=None, hop_size=args['hop_size'], fs=args['fsamp'])
+            spec, phase = get_log_spectrum(type_of_spec=type_of_spec, X=X, win_len=None, hop_size=args['hop_size'],
+                                           fs=args['fsamp'])
         elif features == 'mfcc':
             spec = compute_mfcc_feats(wav_path, X, args['fsamp'], win_len=None, hop_size=args['hop_size'])
         else:
             raise ValueError('Feature type not supported.')
 
-        return spec, feature_len
+        return spec, phase, audio_len
 
-#####################################
-    #if cached:
-        # cache_dir = args['cache_dir'] + features
-        #
-        # if not os.path.exists(cache_dir):
-        #     os.makedirs(cache_dir)
-        #
-        # file_name = os.path.join(cache_dir, os.path.splitext(os.path.basename(wav_path))[0] + '.npy')
-        # if not os.path.exists(file_name):# or force:
-        #     data = get_feats(wav_path, X)
-        #     np.save(file_name, data)
-        #     return data
-        # else:
-        #     try:
-        #         data = np.load(file_name, allow_pickle=True)
-        #     except:
-        #         data = get_feats(wav_path, X)
-        #         np.save(file_name, data)
-        #     return data
+    #####################################
+    # if cached:
+    # cache_dir = args['cache_dir'] + features
+    #
+    # if not os.path.exists(cache_dir):
+    #     os.makedirs(cache_dir)
+    #
+    # file_name = os.path.join(cache_dir, os.path.splitext(os.path.basename(wav_path))[0] + '.npy')
+    # if not os.path.exists(file_name):# or force:
+    #     data = get_feats(wav_path, X)
+    #     np.save(file_name, data)
+    #     return data
+    # else:
+    #     try:
+    #         data = np.load(file_name, allow_pickle=True)
+    #     except:
+    #         data = get_feats(wav_path, X)
+    #         np.save(file_name, data)
+    #     return data
 
-    spec, feature_len = get_feats(wav_path, type_of_spec)
+    spec, phase, audio_len = get_feats(wav_path, type_of_spec)
 
-    return spec, feature_len
-
+    return spec, phase, audio_len
 
 
 class LoadAttackData_ResNet(Dataset):
@@ -247,15 +247,15 @@ class LoadAttackData_ResNet(Dataset):
 
     def __getitem__(self, index):
         track = self.list_IDs[index]  # path to train flac files
-        y = self.labels[track]   # get the corresponding GT labels
+        y = self.labels[track]  # get the corresponding GT labels
 
         # get_features takes the audio and cuts it to 47104 samples (length is like so for the STFT computations...)
-        X, feature_len = get_features(wav_path=track,
-                                      features=self.config['features'],
-                                      args=self.config,
-                                      type_of_spec=self.type_of_spec,
-                                      cached=False,
-                                      force=False)
+        X, phase, audio_len = get_features(wav_path=track,
+                                           features=self.config['features'],
+                                           args=self.config,
+                                           type_of_spec=self.type_of_spec,
+                                           cached=False,
+                                           force=False)
 
         # network_input_shape = 28 * self.win_len
         #
@@ -267,9 +267,7 @@ class LoadAttackData_ResNet(Dataset):
         # X_win = X[:, : network_input_shape]
         # X_win = Tensor(X_win)
 
-        return X, y, feature_len, index
-
-
+        return X, y, phase, audio_len, index
 
 
 class LoadTrainData_ResNet(Dataset):
@@ -285,19 +283,18 @@ class LoadTrainData_ResNet(Dataset):
         self.config = config
         self.type_of_spec = type_of_spec
 
-
     def __len__(self):
         return len(self.list_IDs)
 
     def __getitem__(self, index):
         track = self.list_IDs[index]
         y = self.labels[track]
-        X, _ = get_features(wav_path=track,
-                                      features=self.config['features'],
-                                      args=self.config,
-                                      type_of_spec=self.type_of_spec,
-                                      cached=False,
-                                      force=False)
+        X, _, _ = get_features(wav_path=track,
+                               features=self.config['features'],
+                               args=self.config,
+                               type_of_spec=self.type_of_spec,
+                               cached=False,
+                               force=False)
 
         return X, y
 
@@ -305,8 +302,7 @@ class LoadTrainData_ResNet(Dataset):
 class LoadEvalData_ResNet(Dataset):
     def __init__(self, list_IDs, win_len, config, type_of_spec):
         """
-        self.list_IDs	: list of strings (each string: utt key),
-        self.labels      : dictionary (key: utt key, value: label integer)
+        self.list_IDs	: list of strings (each string: utt key)
         """
 
         self.list_IDs = list_IDs
@@ -319,31 +315,18 @@ class LoadEvalData_ResNet(Dataset):
 
     def __getitem__(self, index):
         track = self.list_IDs[index]
-        X, _ = get_features(wav_path=track,
-                            features=self.config['features'],
-                            args=self.config,
-                            type_of_spec=self.type_of_spec,
-                            cached=False,
-                            force=False)
-
-        #X = get_features_1(track)
-
-        # network_input_shape = 28 * self.win_len
-        #
-        # if feature_len < network_input_shape:
-        #     num_repeats = int(network_input_shape/feature_len) + 1
-        #     X = np.tile(X, (1, num_repeats))
-        #
-        # X_win = X[:, : network_input_shape]
-        # X_win = Tensor(X_win)
-        # return X_win, track
+        X, _, _ = get_features(wav_path=track,
+                               features=self.config['features'],
+                               args=self.config,
+                               type_of_spec=self.type_of_spec,
+                               cached=False,
+                               force=False)
 
         return X, track
 
 
 class LoadEvalData_ResNet_SPEC(Dataset):
     def __init__(self, list_IDs, win_len, config, type_of_spec):
-
         self.list_IDs = list_IDs
         self.win_len = win_len
         self.config = config
@@ -357,10 +340,8 @@ class LoadEvalData_ResNet_SPEC(Dataset):
 
         spec = np.load(path)
 
-        if spec.shape[1] != 84:
-            print(f'oops at index {index}\n')
+        if spec.shape != (1025, 93):
+            print(f'oops at {path}: got {spec.shape} instead of (1025,93)')
             sys.exit()
 
         return spec, path
-
-

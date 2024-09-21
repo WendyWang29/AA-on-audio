@@ -33,6 +33,7 @@ hop_size: 3
 eval_batch_size: 64 #128
 model_path_spec_pow: 'checkpoints/residualnet_model/model_spec_100_64_1e-05/best_model_ASVSpoof2019.pth'
 model_path_spec_mag: 'checkpoints/residualnet_model_mag/model_spec_100_64_1e-05_mag/best_model_ASVSpoof2019.pth'
-
+model_path_spec_pow_v0: 'checkpoints/residualnet_model_v0/model_spec_100_64_1e-05_v0/best_model_ASVSpoof2019_v0.pth'
+model_path_spec_mag_v0: 'checkpoints/residualnet_model_mag_v0/model_spec_100_64_1e-05_mag_v0/best_model_ASVSpoof2019_v0.pth'
 #'checkpoints/residualnet_model/model_spec_100_64_1e-05/best_model_ASVSpoof2019.pth'
 #'./checkpoints/residualnet_model/model_spec_100_64_1e-05/best_model_ASV_LIBRI.pth'

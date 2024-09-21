@@ -20,16 +20,18 @@ def window_stack(a, stepsize=int(0.5*16000), width=int(1*16000)):
 def compute_spectrum(x, type_of_spec):
     if type_of_spec == 'mag':
         s = librosa.stft(x, n_fft=2048, win_length=2048, hop_length=512, window='hann', center=True)
+        phase = np.angle(s)
         a = np.abs(s)
-        feat = a
+        spec = a
     elif type_of_spec == 'pow':
         s = librosa.stft(x, n_fft=2048, win_length=2048, hop_length=512, window='hann', center=True)
         a = np.abs(s) ** 2
-        feat = librosa.power_to_db(a, ref=np.max)
+        spec = librosa.power_to_db(a, ref=np.max)
+        phase = np.angle(s)
     else:
         sys.exit(f'{type_of_spec} is a wrong type of spectrogram')
 
-    return feat
+    return spec, phase
 
 
 def get_log_spectrum(type_of_spec, X, fs, win_len=None, hop_size=None):
@@ -42,8 +44,8 @@ def get_log_spectrum(type_of_spec, X, fs, win_len=None, hop_size=None):
             feat_list.append(feat.T)
         return np.array(feat_list)
     else:
-        feat = compute_spectrum(X, type_of_spec)
-    return feat
+        spec, phase = compute_spectrum(X, type_of_spec)
+    return spec, phase
 
 
 def compute_mfcc(x):

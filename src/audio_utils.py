@@ -8,6 +8,7 @@ warnings.filterwarnings("ignore")
 def read_audio(audio_path, dur=180, fs=16000, trim=False, int_type=False, windowing=False):
 
     X, fs_orig = librosa.load(audio_path, sr=None, duration=dur)
+    audio_len = len(X)
     X = X[:47104]
 
     if fs_orig != fs:
@@ -28,7 +29,7 @@ def read_audio(audio_path, dur=180, fs=16000, trim=False, int_type=False, window
 
         sf.write(audio_path, X, fs)
 
-    return X, fs
+    return X, fs, audio_len
 
 
 def mix_tracks(audio1, audio2):

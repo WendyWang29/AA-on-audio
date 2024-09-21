@@ -215,7 +215,7 @@ def spec_to_tensor(spec, device):
 def clip_by_tensor(t, t_min, t_max):
     return torch.clamp(t, t_min, t_max)
 
-def save_perturbed_audio(file, folder, audio, sr, attack, epsilon=None):
+def save_perturbed_audio(file, folder, audio, sr, attack, epsilon, model, model_version, type_of_spec):
     epsilon_str = str(epsilon).replace('.', 'dot')
 
     # ensure folder path exists
@@ -223,7 +223,7 @@ def save_perturbed_audio(file, folder, audio, sr, attack, epsilon=None):
 
     # create the file path
     file_name = os.path.splitext(os.path.basename(file))[0]
-    file_path = os.path.join(folder, f'{attack}_{file_name}_{epsilon_str}.flac')
+    file_path = os.path.join(folder, f'{attack}_{model}_{model_version}_{type_of_spec}_{file_name}_{epsilon_str}.flac')
 
     # check if the same file already exists. If yes remove the old one
     if os.path.exists(file_path):
@@ -233,7 +233,7 @@ def save_perturbed_audio(file, folder, audio, sr, attack, epsilon=None):
     sf.write(file_path, audio, sr, format='FLAC')
     #print(f'Saved the perturbed audio as: {file_path}')
 
-def save_perturbed_spec(file, folder, spec, attack, epsilon):
+def save_perturbed_spec(file, folder, spec, attack, epsilon, model, model_version, type_of_spec):
 
     epsilon_str = str(epsilon).replace('.', 'dot')
 
@@ -242,7 +242,7 @@ def save_perturbed_spec(file, folder, spec, attack, epsilon):
 
     # create the file path
     file_name = os.path.splitext(os.path.basename(file))[0]
-    file_path = os.path.join(folder, f'{attack}_{file_name}_{epsilon_str}.npy')
+    file_path = os.path.join(folder, f'{attack}_{model}_{model_version}_{type_of_spec}_{file_name}_{epsilon_str}.npy')
 
     # check if the same file already exists. If yes remove the old one
     if os.path.exists(file_path):
