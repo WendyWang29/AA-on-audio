@@ -6,35 +6,94 @@ logging.getLogger('numba').setLevel(logging.WARNING)
 
 logger = logging.getLogger("add_challenge")
 logger.setLevel(logging.INFO)
-import torch
 import pandas as pd
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
-from src.utils import *
 from src.rawnet2_model import RawNet
-from eval_resnet import create_csv
-import csv
-from tqdm import tqdm
 from src.rawnet_utils import LoadEvalData_RawNet
+from src.utils import *
+from tqdm import tqdm
+import csv
+import sys
+import re
+from sklearn import model_selection
+import os
 
-def rawnet_eval(model, df_eval, save_path, config, device):
+
+
+def RawNet_eval(rawnet_model,
+                save_path,
+                device,
+                config,
+                type_of_spec,
+                epsilon,
+                attack_model,
+                attack,
+                dataset,
+                feature,
+                q_res,
+                q_sen):
+
+    epsilon_dot_notation = str(epsilon).replace('.', 'dot')
+
+    script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
+
+    if feature == 'audio':
+        if attack != 'Ensemble':
+            feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
+                                          f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+            # create list of flac files
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+        else:
+            sys.exit('TODO')
+    elif feature == 'spec':
+        if attack != 'Ensemble':
+            feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
+                                          f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}', 'spec')
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_spec_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+            # create list of flac files
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.npy')]
+        else:
+            sys.exit('TODO')
+
+    if os.path.exists(csv_location):
+        os.remove(csv_location)
+        print(f"Existing file '{csv_location}' has been removed.")
+
+        # create and write the csv file
+    with open(csv_location, 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        # write the header
+        csvwriter.writerow(['path'])
+        # write the data rows
+        for index, filename in enumerate(feat_files):
+            csvwriter.writerow([os.path.join(feat_directory, filename)])
+
+        # csv file done
+    df_eval = pd.read_csv(csv_location)
     file_eval = list(df_eval['path'])
 
     if os.path.exists(save_path):
         print(f'save_path exists, removing it to create a new one')
         os.system(f'rm {save_path}')
 
+    assert feature == 'audio', print(f'Feature can only be audio, not {feature}')
+
     feat_set = LoadEvalData_RawNet(list_IDs=file_eval, config=config)
-    feat_loader = DataLoader(feat_set, batch_size=config['eval_batch_size'], shuffle=False, num_workers=15)
-    model.eval()
+    feat_loader = DataLoader(feat_set, batch_size=config_res['eval_batch_size'], shuffle=False, num_workers=15)
+
+    rawnet_model.eval()
 
     with torch.no_grad():
 
         for feat_batch, utt_id in tqdm(feat_loader, total=len(feat_loader)):
-            #fname_list = []
-            #score_list = []
+            # fname_list = []
+            # score_list = []
             feat_batch = feat_batch.to(torch.float32).to(device)
-            score = model(feat_batch)
+            score = rawnet_model(feat_batch)
             probabilities = torch.exp(score)
             probabilities = probabilities.detach().cpu().numpy()
 
@@ -48,33 +107,84 @@ def rawnet_eval(model, df_eval, save_path, config, device):
         print('Scores saved to {}'.format(save_path))
 
 
-def init_eval(config, attack=None, epsilon=None):
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    rawnet_model = RawNet(config['model'], device)
-    rawnet_model = rawnet_model.to(device)
-    rawnet_model.load_state_dict(torch.load(config['model_path_spec'], map_location=device))
 
-    if attack is not None:
-        # df_eval will be a list of perturbed flac files
-        path_to_csv = create_csv(attack, epsilon)
-        df_eval = pd.read_csv(path_to_csv)
-        epsilon = str(epsilon).replace('.', 'dot')
-        save_path = f'./eval/prob_rawnet_eval_{attack}_{epsilon}.csv'
-        rawnet_eval(rawnet_model, df_eval, save_path, config, device)
+
+def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack, dataset, feature, q_res, q_sen):
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
+
+    model_cls = RawNet(config['model'], device)
+    rawnet_model = model_cls.to(device)
+
+    if model_version != 'v0':
+        sys.exit(f'Version {model_version} is not accepted')
+
+    # load the correct model
+    if type_of_spec == 'mag':
+        if model_version == 'v0':
+            rawnet_model.load_state_dict(torch.load(os.path.join(script_dir, config['model_path_spec_mag_v0']), map_location=device), strict=False)
+    elif type_of_spec == 'pow':
+        if model_version == 'v0':
+            rawnet_model.load_state_dict(torch.load(os.path.join(script_dir, config['model_path_spec_pow_v0']), map_location=device), strict=False)
     else:
-        # no attack performed
-        df_eval = pd.read_csv(config["df_eval_path"])
-        save_path = './eval/prob_rawnet_eval.csv'
-        rawnet_eval(rawnet_model, df_eval, save_path, config, device)
+        sys.exit('Wrong type of spectrogram mode: should be pow or mag')
+
+
+    if attack != 'Ensemble':
+        epsilon_str = str(epsilon).replace('.', 'dot')
+        save_path = os.path.join(script_dir,
+                                 'eval',
+                                 f'probs_Rawnet_{model_version}_{attack}_{attack_model}_{dataset}_{epsilon_str}_{type_of_spec}_{feature}.csv')
+        RawNet_eval(rawnet_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
+                    feature, q_res, q_sen)
+
+
+    elif attack == 'Ensemble':
+        epsilon_str = str(epsilon).replace('.', 'dot')
+        save_path = os.path.join(script_dir,
+                                 'eval',
+                                 f'probs_Rawnet_{model_version}_Ensemble_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
+        RawNet_eval(rawnet_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature, q_res, q_sen)
+
+    else:
+        sys.exit(f'Invalid attack combination for {attack}, {attack_model}')
+
 
 
 
 if __name__ == '__main__':
-
     seed_everything(1234)
     set_gpu(-1)
 
-    config_path = 'config/rawnet2.yaml'
-    config = read_yaml(config_path)
+    script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
+    config_path = os.path.join(script_dir, 'config/rawnet2.yaml')
+    config_res = read_yaml(config_path)
 
-    init_eval(config, attack='FGSM', epsilon=0.4)
+    '''
+    ########## INSERT PARAMETERS ##########
+    '''
+    attack = 'FGSM'  # 'FGSM' or 'Ensemble'
+    attack_model = 'SENet'  #'ResNet' or 'SENet'
+    epsilon = 3.0
+    dataset = '3s'  # '3s' or 'whole'
+    model_version = 'v0'  # or 'old'  version of eval and attack_model
+    type_of_spec = 'pow'  # 'pow' or 'mag'
+    feature = 'audio'  # RawNet can only work with audio files
+    q_res = None
+    q_sen = None
+
+    '''
+    #######################################
+    '''
+
+    init_eval(config_res,
+              type_of_spec=type_of_spec,
+              epsilon=epsilon,
+              attack_model=attack_model,
+              model_version=model_version,
+              attack=attack,
+              dataset=dataset,
+              feature=feature,
+              q_res=q_res,
+              q_sen=q_sen)

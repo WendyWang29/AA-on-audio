@@ -88,7 +88,7 @@ class LoadEvalData_RawNet(Dataset):
         """
 
         self.list_IDs = list_IDs
-        self.win_len = 4
+        #self.win_len = 4
         self.config = config
 
 
@@ -98,17 +98,20 @@ class LoadEvalData_RawNet(Dataset):
     def __getitem__(self, index):
         track = self.list_IDs[index]
         X = get_waveform(wav_path=track, config=self.config)
-        feature_len = X.shape[0]
-        network_input_shape = 16000 * self.win_len
-        if feature_len < network_input_shape:
-            num_repeats = int(network_input_shape/feature_len) + 1
+
+        audio_len = X.shape[0]
+        net_input_length = 47104
+
+        if audio_len < net_input_length:
+            num_repeats = int(net_input_length / audio_len) + 1
             X = np.tile(X, num_repeats)
-            # feature_len = X.shape[1]
+            X = X[:net_input_length]
+        else:
+            X = X[:net_input_length]
 
-        X_win = X[: network_input_shape]
-        X_win = Tensor(X_win)
+        assert len(X) == net_input_length, f'Wrong length of input: {len(X)} is not 47104'
 
-        return X_win, track
+        return X, track
 
 
 class LoadTrainData_RawNet(Dataset):
@@ -120,7 +123,7 @@ class LoadTrainData_RawNet(Dataset):
 
         self.list_IDs = list_IDs
         self.labels = labels
-        self.win_len = 4
+        #self.win_len = 4
         self.config = config
 
 
@@ -131,19 +134,20 @@ class LoadTrainData_RawNet(Dataset):
         track = self.list_IDs[index]
         y = self.labels[track]
         X = get_waveform(wav_path=track, config=self.config)
-        feature_len = X.shape[0]
-        network_input_shape = 16000 * self.win_len
-        if feature_len < network_input_shape:
-            num_repeats = int(network_input_shape/feature_len) + 1
+
+        audio_len = X.shape[0]
+        net_input_length = 47104
+
+        if audio_len < net_input_length:
+            num_repeats = int(net_input_length/audio_len) + 1
             X = np.tile(X, num_repeats)
-            # feature_len = X.shape[1]
+            X = X[:net_input_length]
+        else:
+            X = X[:net_input_length]
 
-        X_win = X[: network_input_shape]
-        X_win = Tensor(X_win)
+        assert len(X) == net_input_length, f'Wrong length of input: {len(X)} is not 47104'
 
-        #assert X_win.shape == (64000,), f'Expected shape (64000,) but got {X_win.shape}'
-
-        return X_win, y
+        return X, y
 
 
 
@@ -161,15 +165,18 @@ class LoadAttackData_RawNet(Dataset):
         track = self.list_IDs[index]
         y = self.labels[track]
         X = get_waveform(wav_path=track, config=self.config)
-        feature_len = X.shape[0]
-        network_input_shape = 16000 * self.win_len
-        if feature_len < network_input_shape:
-            num_repeats = int(network_input_shape / feature_len) + 1
+
+        audio_len = X.shape[0]
+        net_input_length = 47104
+
+        if audio_len < net_input_length:
+            num_repeats = int(net_input_length / audio_len) + 1
             X = np.tile(X, num_repeats)
-            # feature_len = X.shape[1]
+            X = X[:net_input_length]
+        else:
+            X = X[:net_input_length]
 
-        X_win = X[: network_input_shape]
-        X_win = Tensor(X_win)
+        assert len(X) == net_input_length, f'Wrong length of input: {len(X)} is not 47104'
 
-        return X_win, y, feature_len, index
+        return X, y, audio_len, index
 

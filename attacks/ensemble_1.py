@@ -1,7 +1,4 @@
-import matplotlib.pyplot as plt
-import pandas as pd
 
-from scipy import stats
 import logging
 
 logging.getLogger('numba').setLevel(logging.WARNING)
@@ -16,14 +13,14 @@ import sys
 
 from tqdm import tqdm
 from src.resnet_model import SpectrogramModel
-from attacks_utils import save_perturbed_spec
+from attacks_utils import save_perturbed_spec, save_perturbed_audio
 from src.SENet.SENet_model import se_resnet34_custom
 from src.resnet_utils import LoadAttackData_ResNet
 from torch.utils.data import DataLoader
+import librosa
 
 
-
-def EnsembleV1_dataset(epsilon, device, ResNet_model, SENet_model, config, type_of_spec):
+def EnsembleV1_dataset(epsilon, device, ResNet_model, SENet_model, config, dataset, model_version, type_of_spec):
     """
     Ensemble attack on dataset of audio which is longer than 3s
     :param epsilon: float
@@ -32,6 +29,8 @@ def EnsembleV1_dataset(epsilon, device, ResNet_model, SENet_model, config, type_
     :param ResNet_model: SpectrogramModel
     :param SENet_model: CustomResNet
     :param config: dict
+    :param dataset: string
+    :param model_version: string
     :param type_of_spec: string
     :return:
     """
@@ -40,20 +39,28 @@ def EnsembleV1_dataset(epsilon, device, ResNet_model, SENet_model, config, type_
 
     # ENSEMBLE ATTACK ON EVAL DATASET OF AUDIO WHICH IS LONGER THAN 3S
 
-    eval_path = '../data/df_eval_19_3s.csv'
+    script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
+
+    if dataset == '3s':
+        eval_path = os.path.join(script_dir, '..', 'data/df_eval_19_3s.csv')
+    elif dataset == 'whole':
+        eval_path = os.path.join(script_dir, '..', 'data/df_eval_19.csv')
+    else:
+        sys.exit(f'{dataset} is not a valid choice of dataset, should be 3s or whole')
+
     df_eval = pd.read_csv(eval_path)
 
     epsilon_str = str(epsilon).replace('.', 'dot')
 
     # the audio folder will contain the spec folder
-    audio_folder = f'QUANT_ENS_{q_res}_{q_sen}_{epsilon_str}_dataset'
+    audio_folder = f'QUANT_ENS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_str}'
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    #audio_folder = os.path.join(current_dir, f'Ensemble', audio_folder)
+    audio_folder = os.path.join(current_dir, f'Ensemble', audio_folder)
     spec_folder = os.path.join(current_dir, f'Ensemble', audio_folder, 'spec')
 
-    #os.makedirs(audio_folder, exist_ok=True)
+    # os.makedirs(audio_folder, exist_ok=True)
     os.makedirs(spec_folder, exist_ok=True)
-    #print(f'Saving the perturbed audio in {audio_folder}\n')
+    print(f'Saving the perturbed audio in {audio_folder}\n')
     print(f'Saving the perturbed spec in {spec_folder}')
 
     # data loader
@@ -64,7 +71,7 @@ def EnsembleV1_dataset(epsilon, device, ResNet_model, SENet_model, config, type_
                                      labels=labels_eval,
                                      win_len=config['win_len'],
                                      config=config,
-                                     type_of_spec='pow')
+                                     type_of_spec=type_of_spec)
     data_loader = DataLoader(feat_set,
                              batch_size=config['eval_batch_size'],
                              shuffle=False,
@@ -76,7 +83,19 @@ def EnsembleV1_dataset(epsilon, device, ResNet_model, SENet_model, config, type_
     effect_res_array = []
     effect_sen_array = []
 
-    for batch_x, batch_y, time_frames, index in tqdm(data_loader, total=len(data_loader)):
+    win_length = 2048
+    n_fft = 2048
+    hop_length = 512
+    window = 'hann'
+
+    print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
+    print('The Ensemble attack starts...\n')
+    print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸')
+
+    for batch_x, batch_y, phase, audio_len, index in tqdm(data_loader, total=len(data_loader)):
+
+        phase = phase.numpy()
+
         batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
         batch_z = batch_x.clone().to(device)
@@ -135,6 +154,7 @@ def EnsembleV1_dataset(epsilon, device, ResNet_model, SENet_model, config, type_
         pert_batch = batch_x + epsilon * grad.sign()
 
         del batch_x, batch_z, grad_res, grad_sen, abs_grad_res, abs_grad_sen, grad, matrix
+
         '''
         compute the effectiveness
         '''
@@ -159,29 +179,51 @@ def EnsembleV1_dataset(epsilon, device, ResNet_model, SENet_model, config, type_
         '''
         spec --> audio conversion
         '''
-        pert_batch = pert_batch.squeeze(0).detach().cpu().numpy()
+        perturbed_batch = pert_batch.squeeze(0).detach().cpu().numpy()
         for i in range(pert_batch.shape[0]):
-            # working on each row of the matrix of perturbed specs
-            sliced_spec = pert_batch[i][:, :time_frames[i]]
 
+            # save the spec as a (1025,93) spec for all specs
+            spec = perturbed_batch[i]
             save_perturbed_spec(file=file_eval[index[i]],
                                 folder=spec_folder,
-                                spec=sliced_spec,
+                                spec=spec,
                                 epsilon=epsilon,
-                                attack=f'QUANT_ENS_{q_res}_{q_sen}')
+                                attack='Ensemble',
+                                model='ResSen',
+                                model_version=model_version,
+                                type_of_spec=type_of_spec)
 
-            # audio, _ = spectrogram_inversion_batch(config=config,
-            #                                        index=index[i],
-            #                                        spec=sliced_spec,
-            #                                        phase_info=True)
-            #
-            # save_perturbed_audio(file=file_eval[index[i]],
-            #                      folder=audio_folder,
-            #                      audio=audio,
-            #                      sr=16000,
-            #                      epsilon=epsilon,
-            #                      attack=f'QUANT_ENS_{q_res}_{q_sen}')
-            # del audio, sliced_spec
+            # spectrogram inversion
+            linear = librosa.db_to_power(spec)
+            mag = np.sqrt(linear)
+
+            phase_single_audio = phase[i]
+
+            recon_audio = librosa.istft(mag * np.exp(1j * phase_single_audio),
+                                        n_fft=n_fft,
+                                        window=window,
+                                        win_length=win_length,
+                                        hop_length=hop_length,
+                                        center=True)
+
+            recon_audio = librosa.util.normalize(recon_audio)
+
+            # cut the audio to original audio length
+            sliced_audio = recon_audio[:audio_len[i]]
+
+            save_perturbed_audio(file=file_eval[index[i]],
+                                 folder=audio_folder,
+                                 audio=sliced_audio,
+                                 sr=16000,
+                                 attack='Ensemble',
+                                 epsilon=epsilon,
+                                 model='ResSen',
+                                 model_version=model_version,
+                                 type_of_spec=type_of_spec)
+
+
+            del sliced_audio, spec
+
         del pert_batch
         tqdm.write(f'Effectiveness ResNet: {effect_perc_res:.2f}% | avg.effectiveness ResNet: {avg_res:.2f} \n'
                    f'Effectiveness SENet: {effect_perc_sen:.2f}% | avg.effectiveness SENet: {avg_sen:.2f}\n'
@@ -190,40 +232,54 @@ def EnsembleV1_dataset(epsilon, device, ResNet_model, SENet_model, config, type_
         gc.collect()
 
 
-
-
 if __name__ == '__main__':
     seed_everything(1234)
     set_gpu(-1)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
 
-    config_ResNet_path = '../config/residualnet_train_config.yaml'
-    config_SENet_path = '../config/SENet.yaml'
+    '''
+    ##############################
+    PARAMETERS
+    ##############################
+    '''
+    model_version = 'v0'
+    type_of_spec = 'pow'
+    dataset = '3s'  # '3s' or 'whole'
+    epsilon = 3.0
+    '''
+    ##############################
+    '''
 
-    config_ResNet = read_yaml(config_ResNet_path)
-    config_SENet = read_yaml(config_SENet_path)
+    assert model_version == 'v0', print('Ensemble attack is implemented only for model version v0')
+
+    config_res_path = os.path.join(script_dir, '../config/residualnet_train_config.yaml')
+    config_sen_path = os.path.join(script_dir, '../config/SENet.yaml')
+
+    config_ResNet = read_yaml(config_res_path)
+    config_SENet = read_yaml(config_sen_path)
 
     ResNet_model = SpectrogramModel().to(device)
     SENet_model = se_resnet34_custom(num_classes=2).to(device)
 
-    ResNet_model.load_state_dict(torch.load(os.path.join('..', config_ResNet['model_path_spec_pow']), map_location=device), strict=False)
-    SENet_model.load_state_dict(torch.load(os.path.join('..', config_SENet['model_path_spec_pow']), map_location=device), strict=False)
+    ResNet_model.load_state_dict(
+        torch.load(os.path.join(script_dir, '..', config_ResNet['model_path_spec_pow_v0']), map_location=device),
+        strict=False)
+    SENet_model.load_state_dict(
+        torch.load(os.path.join(script_dir, '..', config_SENet['model_path_spec_pow_v0']), map_location=device),
+        strict=False)
 
     ResNet_model.eval()
     SENet_model.eval()
 
     print(f'Models loaded...\n')
-
-    eval_path = os.path.join('..', config_SENet['df_eval_path'])  # eval dataset of ASVSpoof2019
-
-    epsilon = 3.0
-    type_of_spec = 'pow'
-
-    print(f'Epsilon: {epsilon}, \n')
+    print(f'Epsilon: {epsilon} | models version: v0 \n')
 
     EnsembleV1_dataset(epsilon,
-                        device,
-                        ResNet_model,
-                        SENet_model,
-                        config_ResNet,
-                        type_of_spec)
+                       device,
+                       ResNet_model,
+                       SENet_model,
+                       config_ResNet,
+                       dataset,
+                       model_version,
+                       type_of_spec)

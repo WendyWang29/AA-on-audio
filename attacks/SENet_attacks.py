@@ -158,7 +158,7 @@ if __name__ == '__main__':
     ########## INSERT PARAMETERS ##########
     '''
     attack = 'FGSM'  # 'FGSM_3s' or 'FGSM'
-    epsilon = 0.0
+    epsilon = 3.0
     dataset = '3s'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'
     type_of_spec = 'pow'  # 'pow' or 'mag'
