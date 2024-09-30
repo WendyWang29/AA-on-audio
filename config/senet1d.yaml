@@ -1,0 +1,28 @@
+model:
+  first_conv: 1024   # no. of filter coefficients
+  in_channels: 1
+  filts: [20, [20, 20], [20, 128], [128, 128]] # no. of filters channel in residual blocks
+  blocks: [2, 4]
+  nb_fc_node: 1024
+  gru_node: 1024
+  nb_gru_layer: 3
+  nb_classes: 2
+
+features: 'waveform'
+num_epochs: 100
+batch_size: 64
+eval_batch_size: 64
+lr: 1e-04
+
+model_path: ''
+save_trained_name: 'SENet1D_model_ASVSpoof2019_v0.pth'
+model_folder: 'checkpoints/SENet1D_model_v0'
+
+df_train_path: 'data/df_train.csv'
+df_dev_path: 'data/df_dev.csv'
+df_eval_path: 'data/df_eval_19.csv'
+df_eval_path_3s: 'data/df_eval_19_3s.csv'
+
+early_stopping: 10
+
+model_path_spec_pow_v0: '../checkpoints/SENet1D_model_v0/model_waveform_100_32_1e-04_v0/SENet1D_model_ASVSpoof2019_v0.pth'

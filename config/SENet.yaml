@@ -2,7 +2,7 @@ features: 'spec'
 
 save_trained_name: 'best_model_ASVSpoof2019_v0.pth'
 model_folder_pow: 'checkpoints/SENet_model_v0'
-model_folder_mag: 'checkpoints/SENet_model_mag_v0'
+model_folder_mag: 'checkpoints/SENet_model_mag'
 
 batch_size: 64
 num_epochs: 100
@@ -26,4 +26,4 @@ hop_size: 3
 
 eval_batch_size: 64
 model_path_spec_pow_v0: 'checkpoints/SENet_model_v0/model_spec_100_64_1e-05_v0/best_model_ASVSpoof2019_v0.pth'
-model_path_spec_mag_v0: 'checkpoints/SENet_model_mag_v0/model_spec_100_64_1e-05_mag_v0/best_model_ASVSpoof2019_v0.pth'
+model_path_spec_mag: 'checkpoints/SENet_model_mag/model_spec_100_64_1e-05_mag/best_model_ASVSpoof2019_mag.pth'

@@ -47,7 +47,14 @@ def RawNet_eval(rawnet_model,
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
         else:
-            sys.exit('TODO')
+            assert attack == 'Ensemble', print('Wrong attack')
+            feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble',
+                                          f'QUANT_ENS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_flac_Ensemble_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+            # create list of flac files
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+
     elif feature == 'spec':
         if attack != 'Ensemble':
             feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
@@ -57,7 +64,15 @@ def RawNet_eval(rawnet_model,
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.npy')]
         else:
-            sys.exit('TODO')
+            assert attack == 'Ensemble', print('Wrong attack')
+            feat_directory = os.path.join(script_dir, 'attacks',
+                                          f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
+                                          f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}',
+                                          'spec')
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_spec_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+            # create list of flac files
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.npy')]
 
     if os.path.exists(csv_location):
         os.remove(csv_location)
@@ -164,15 +179,15 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'FGSM'  # 'FGSM' or 'Ensemble'
+    attack = 'Ensemble'  # 'FGSM' or 'Ensemble'
     attack_model = 'SENet'  #'ResNet' or 'SENet'
     epsilon = 3.0
     dataset = '3s'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
     feature = 'audio'  # RawNet can only work with audio files
-    q_res = None
-    q_sen = None
+    q_res = 30
+    q_sen = 30
 
     '''
     #######################################

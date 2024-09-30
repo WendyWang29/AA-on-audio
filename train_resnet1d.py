@@ -1,5 +1,7 @@
 import logging
 
+from src.ResNet1D.resnet1d_model import SpectrogramModel1D
+
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('tensorflow').setLevel(logging.WARNING)
 logging.getLogger('numba').setLevel(logging.WARNING)
@@ -11,7 +13,7 @@ import pandas as pd
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
 from src.utils import *
-from src.rawnet2_model import RawNet
+
 from sklearn import model_selection
 from src.rawnet_utils import LoadTrainData_RawNet, train_epoch_rawnet, evaluate_accuracy_rawnet
 from src.resnet_utils import evaluate_metrics, get_loss_resnet
@@ -31,8 +33,7 @@ def main(config):
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
 
-    model_cls = RawNet(config['model'], device)
-    model = model_cls.to(device)
+    model = SpectrogramModel1D().to(device)
 
     df_train = pd.read_csv(os.path.join(script_dir, config["df_train_path"]))
     df_dev = pd.read_csv(os.path.join(script_dir, config["df_dev_path"]))
@@ -59,8 +60,12 @@ def main(config):
     early_stopping = 0
     for epoch in range(config['num_epochs']):
         if early_stopping < config['early_stopping']:
+            '''
+            We can use the same trainer and evaluators as for the RawNet
+            only a different model (the ResNet1D gets passed)
+            '''
             running_loss, train_accuracy = train_epoch_rawnet(data_loader=train_loader, model=model, device=device)
-            valid_accuracy = evaluate_accuracy_rawnet(dev_loader, model, device)
+            #valid_accuracy = evaluate_accuracy_rawnet(dev_loader, model, device)
             valid_auc, valid_eer, valid_accuracy = evaluate_metrics(dev_loader, model, device)
             valid_loss = get_loss_resnet(dev_loader, model, device)
             writer.add_scalar('train_accuracy', train_accuracy, epoch)
@@ -73,6 +78,14 @@ def main(config):
             if valid_loss < best_loss:
                 logger.info(f"Best model found at epoch {epoch}")
                 torch.save(model.state_dict(), os.path.join(model_save_path, config['save_trained_name']))
+
+                # Check if the file exists after saving
+                temp_path = os.path.join(model_save_path, config['save_trained_name'])
+                if os.path.exists(temp_path):
+                    logger.info(f"Model saved successfully at {temp_path}")
+                else:
+                    logger.error(f"Error: Model was not saved at {temp_path}")
+
                 early_stopping = 0
             else:
                 early_stopping += 1
@@ -85,10 +98,13 @@ def main(config):
 if __name__ == '__main__':
 
     seed_everything(1234)
-    set_gpu(5)
+    set_gpu(-1)
 
+    '''
+    to train the ResNet model with 1d input we can use the same dataloader as the RawNet2
+    '''
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
-    config_path = os.path.join(script_dir, 'config/rawnet2.yaml')
+    config_path = os.path.join(script_dir, 'config/resnet1d.yaml')
     config_res = read_yaml(config_path)
 
     main(config_res)

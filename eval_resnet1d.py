@@ -9,8 +9,8 @@ logger.setLevel(logging.INFO)
 import pandas as pd
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
-from src.SENet.SENet_model import se_resnet34_custom
-from src.resnet_utils import LoadEvalData_ResNet, LoadEvalData_ResNet_SPEC
+from src.ResNet1D.resnet1d_model import SpectrogramModel1D
+from src.rawnet_utils import LoadEvalData_RawNet
 from src.utils import *
 from tqdm import tqdm
 import csv
@@ -21,7 +21,7 @@ import os
 
 
 
-def SENet_eval(senet_model,
+def ResNet1D_eval(rawnet_model,
                 save_path,
                 device,
                 config,
@@ -65,11 +65,12 @@ def SENet_eval(senet_model,
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.npy')]
         else:
             assert attack == 'Ensemble', print('Wrong attack')
-            feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble',
-                                          f'QUANT_ENS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}',
+            feat_directory = os.path.join(script_dir, 'attacks',
+                                          f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
+                                          f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}',
                                           'spec')
             csv_location = os.path.join(script_dir, 'eval',
-                                        f'list_spec_Ensemble_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+                                        f'list_spec_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.npy')]
 
@@ -94,20 +95,12 @@ def SENet_eval(senet_model,
         print(f'save_path exists, removing it to create a new one')
         os.system(f'rm {save_path}')
 
+    assert feature == 'audio', print(f'Feature can only be audio, not {feature}')
 
-
-    if feature == 'spec':
-        feat_set = LoadEvalData_ResNet_SPEC(list_IDs=file_eval, win_len=config_res['win_len'], config=config,
-                                            type_of_spec=type_of_spec)
-    elif feature == 'audio':
-        feat_set = LoadEvalData_ResNet(list_IDs=file_eval, win_len=config_res['win_len'], config=config,
-                                            type_of_spec=type_of_spec)
-    else:
-        sys.exit('Wrong type of feature, should be spec or audio')
-
+    feat_set = LoadEvalData_RawNet(list_IDs=file_eval, config=config)
     feat_loader = DataLoader(feat_set, batch_size=config_res['eval_batch_size'], shuffle=False, num_workers=15)
 
-    senet_model.eval()
+    rawnet_model.eval()
 
     with torch.no_grad():
 
@@ -115,7 +108,7 @@ def SENet_eval(senet_model,
             # fname_list = []
             # score_list = []
             feat_batch = feat_batch.to(torch.float32).to(device)
-            score = senet_model(feat_batch.unsqueeze(dim=1))
+            score = rawnet_model(feat_batch)
             probabilities = torch.exp(score)
             probabilities = probabilities.detach().cpu().numpy()
 
@@ -136,7 +129,7 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
 
-    senet_model = se_resnet34_custom(num_classes=2).to(device)
+    model = SpectrogramModel1D().to(device)
 
     if model_version != 'v0':
         sys.exit(f'Version {model_version} is not accepted')
@@ -144,10 +137,10 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
     # load the correct model
     if type_of_spec == 'mag':
         if model_version == 'v0':
-            senet_model.load_state_dict(torch.load(os.path.join(script_dir, config['model_path_spec_mag_v0']), map_location=device), strict=False)
+            model.load_state_dict(torch.load(os.path.join(script_dir, config['model_path_spec_mag_v0']), map_location=device), strict=False)
     elif type_of_spec == 'pow':
         if model_version == 'v0':
-            senet_model.load_state_dict(torch.load(os.path.join(script_dir, config['model_path_spec_pow_v0']), map_location=device), strict=False)
+            model.load_state_dict(torch.load(os.path.join(script_dir, config['model_path_spec_pow_v0']), map_location=device), strict=False)
     else:
         sys.exit('Wrong type of spectrogram mode: should be pow or mag')
 
@@ -156,8 +149,8 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
-                                 f'probs_SENet_{model_version}_{attack}_{attack_model}_{dataset}_{epsilon_str}_{type_of_spec}_{feature}.csv')
-        SENet_eval(senet_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
+                                 f'probs_ResNet1D_{model_version}_{attack}_{attack_model}_{dataset}_{epsilon_str}_{type_of_spec}_{feature}.csv')
+        ResNet1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
                     feature, q_res, q_sen)
 
 
@@ -165,8 +158,8 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
-                                 f'probs_SENet_{model_version}_Ensemble_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
-        SENet_eval(senet_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature, q_res, q_sen)
+                                 f'probs_ResNet1D_{model_version}_Ensemble_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
+        ResNet1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature, q_res, q_sen)
 
     else:
         sys.exit(f'Invalid attack combination for {attack}, {attack_model}')
@@ -176,24 +169,24 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
 
 if __name__ == '__main__':
     seed_everything(1234)
-    set_gpu(5)
+    set_gpu(-1)
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
-    config_path = os.path.join(script_dir, 'config/SENet.yaml')
+    config_path = os.path.join(script_dir, 'config/resnet1d.yaml')
     config_res = read_yaml(config_path)
 
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'FGSM'  # 'FGSM' or 'Ensemble'
-    attack_model = 'SENet'  #'ResNet' or 'SENet'
+    attack = 'Ensemble'  # 'FGSM' or 'Ensemble'
+    attack_model = None  #'ResNet' or 'SENet'
     epsilon = 3.0
-    dataset = 'whole'  # '3s' or 'whole'
+    dataset = '3s'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
-    feature = 'spec'  #'spec' or 'audio'
-    q_res = 30
-    q_sen = 30
+    feature = 'audio'  # RawNet can only work with audio files
+    q_res = 10
+    q_sen = 10
 
     '''
     #######################################

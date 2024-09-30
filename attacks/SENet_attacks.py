@@ -20,7 +20,7 @@ def FGSM_SENet(epsilon, config, model, model_version, dataset, type_of_spec, df_
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
     # ex. audio folder: 'FGSM_SENet_v0_3s_pow_3dot0'
-    audio_folder = f'FGSM_SENet_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
+    audio_folder = f'FGSM_SENet_{model_version}_{dataset}_norm_{type_of_spec}_{epsilon_str}'
     audio_folder = os.path.join(current_dir, f'FGSM_SENet_{model_version}_{type_of_spec}', audio_folder)
     spec_folder = os.path.join(current_dir, f'FGSM_SENet_{model_version}_{type_of_spec}', audio_folder, 'spec')
 
@@ -45,7 +45,7 @@ def FGSM_SENet(epsilon, config, model, model_version, dataset, type_of_spec, df_
 
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
     print('The FGSM attack starts...\n')
-    print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸')
+    print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
 
     effect = []  # for storing the unbalanced effectiveness on Resnet
 
@@ -147,7 +147,7 @@ def FGSM_SENet(epsilon, config, model, model_version, dataset, type_of_spec, df_
 if __name__ == '__main__':
 
     seed_everything(1234)
-    set_gpu(-1)
+    set_gpu(5)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
@@ -159,7 +159,7 @@ if __name__ == '__main__':
     '''
     attack = 'FGSM'  # 'FGSM_3s' or 'FGSM'
     epsilon = 3.0
-    dataset = '3s'  # '3s' or 'whole'
+    dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'
     type_of_spec = 'pow'  # 'pow' or 'mag'
     '''

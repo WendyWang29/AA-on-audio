@@ -2,6 +2,7 @@ import logging
 
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('tensorflow').setLevel(logging.WARNING)
+logging.getLogger('numba').setLevel(logging.WARNING)
 
 logger = logging.getLogger("add_challenge")
 logger.setLevel(logging.INFO)
@@ -12,24 +13,29 @@ from src.LCNN_model.LCNN_model import LCNN
 from src.resnet_utils import LoadTrainData_ResNet, train_epoch_resnet, evaluate_accuracy_resnet, get_loss_resnet, evaluate_metrics
 from src.utils import *
 from sklearn import model_selection
+import sys
 
 
-def main(config):
+def main(config, type_of_spec):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model_tag = 'model_{}_{}_{}_{}'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
-    model_save_path = os.path.join(config['model_folder'], model_tag)
+    script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
+
+    assert type_of_spec == 'pow', print('mag spec to be implemented')
+
+    model_tag = 'model_{}_{}_{}_{}_v0'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+    model_save_path = os.path.join(config['model_folder_pow'], model_tag)
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
 
     model = LCNN().to(device)
 
-    print('\nModel state dictionary parameters:\n')
-    sd = model.state_dict()
-    for key, value in sd.items():
-        print(f'{key}: {value.shape}')
+    # print('\nModel state dictionary parameters:\n')
+    # sd = model.state_dict()
+    # for key, value in sd.items():
+    #     print(f'{key}: {value.shape}')
 
-    df_train = pd.read_csv(config["df_train_path"])
-    df_dev = pd.read_csv(config["df_dev_path"])
+    df_train = pd.read_csv(os.path.join(script_dir, config["df_train_path"]))
+    df_dev = pd.read_csv(os.path.join(script_dir, config["df_dev_path"]))
 
     '''
     we are using ResNet dataloaders
@@ -37,14 +43,14 @@ def main(config):
 
     d_label_trn = dict(zip(df_train['path'], df_train['label']))
     file_train = list(df_train['path'])
-    train_set = LoadTrainData_ResNet(list_IDs=file_train, labels=d_label_trn, win_len=config['win_len'], config=config)
+    train_set = LoadTrainData_ResNet(list_IDs=file_train, labels=d_label_trn, win_len=config['win_len'], config=config, type_of_spec=type_of_spec)
     train_loader = DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=15)
     del train_set, d_label_trn
 
     # define validation dataloader
     d_label_dev = dict(zip(df_dev['path'], df_dev['label']))
     file_dev = list(df_dev['path'])
-    dev_set = LoadTrainData_ResNet(list_IDs=file_dev, labels=d_label_dev, win_len=config['win_len'], config=config)
+    dev_set = LoadTrainData_ResNet(list_IDs=file_dev, labels=d_label_dev, win_len=config['win_len'], config=config, type_of_spec=type_of_spec)
     dev_loader = DataLoader(dev_set, batch_size=config['batch_size'], shuffle=True, num_workers=15)
     del dev_set, d_label_dev
 
@@ -55,7 +61,7 @@ def main(config):
     for epoch in range(config['num_epochs']):
         if early_stopping < config['early_stopping']:
             running_loss, train_accuracy = train_epoch_resnet(train_loader, model, config['lr'], device)
-            valid_accuracy = evaluate_accuracy_resnet(dev_loader, model, device)
+            #valid_accuracy = evaluate_accuracy_resnet(dev_loader, model, device)
             valid_auc, valid_eer, valid_accuracy = evaluate_metrics(dev_loader, model, device)
             valid_loss = get_loss_resnet(dev_loader, model, device)
             writer.add_scalar('train_accuracy', train_accuracy, epoch)
@@ -83,7 +89,11 @@ if __name__ == '__main__':
     seed_everything(1234)
     set_gpu(-1)
 
-    config_path = 'config/LCNN.yaml'
+    script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
+    config_path = os.path.join(script_dir, 'config/LCNN.yaml')
     config_res = read_yaml(config_path)
+    type_of_spec = 'pow'  # 'mag'
 
-    main(config_res)
+    print('Training starts for LCNN model v0\n')
+
+    main(config_res, type_of_spec)

@@ -8,10 +8,11 @@ logger = logging.getLogger("add_challenge")
 logger.setLevel(logging.INFO)
 import torch
 import pandas as pd
+from src.SENet.senet1d_model import se_resnet341d_custom
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
 from src.utils import *
-from src.rawnet2_model import RawNet
+
 from sklearn import model_selection
 from src.rawnet_utils import LoadTrainData_RawNet, train_epoch_rawnet, evaluate_accuracy_rawnet
 from src.resnet_utils import evaluate_metrics, get_loss_resnet
@@ -31,8 +32,7 @@ def main(config):
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
 
-    model_cls = RawNet(config['model'], device)
-    model = model_cls.to(device)
+    model = se_resnet341d_custom(num_classes=2).to(device)
 
     df_train = pd.read_csv(os.path.join(script_dir, config["df_train_path"]))
     df_dev = pd.read_csv(os.path.join(script_dir, config["df_dev_path"]))
@@ -85,10 +85,10 @@ def main(config):
 if __name__ == '__main__':
 
     seed_everything(1234)
-    set_gpu(5)
+    set_gpu(-1)
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
-    config_path = os.path.join(script_dir, 'config/rawnet2.yaml')
+    config_path = os.path.join(script_dir, 'config/senet1d.yaml')
     config_res = read_yaml(config_path)
 
     main(config_res)

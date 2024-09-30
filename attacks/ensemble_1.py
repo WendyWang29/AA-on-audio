@@ -34,8 +34,8 @@ def EnsembleV1_dataset(epsilon, device, ResNet_model, SENet_model, config, datas
     :param type_of_spec: string
     :return:
     """
-    q_res = 10
-    q_sen = 10
+    q_res = 30
+    q_sen = 30
 
     # ENSEMBLE ATTACK ON EVAL DATASET OF AUDIO WHICH IS LONGER THAN 3S
 

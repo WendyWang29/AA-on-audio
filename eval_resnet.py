@@ -47,9 +47,14 @@ def ResNet_eval(resnet_model,
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
         else:
-            sys.exit('TODO')
+            assert attack == 'Ensemble', print('Wrong attack')
+            feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble', f'QUANT_ENS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_flac_Ensemble_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+            # create list of flac files
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
     elif feature == 'spec':
-        if attack != 'Ensemble':
+        if attack != 'Ensemble' and attack != None:
             feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
                                           f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}', 'spec')
             csv_location = os.path.join(script_dir, 'eval',
@@ -57,7 +62,14 @@ def ResNet_eval(resnet_model,
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.npy')]
         else:
-            sys.exit('TODO')
+            assert attack == 'Ensemble', print('Wrong attack')
+            feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble',
+                                          f'QUANT_ENS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}', 'spec')
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_spec_Ensemble_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+            # create list of flac files
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.npy')]
+
 
     if os.path.exists(csv_location):
         os.remove(csv_location)
@@ -72,7 +84,7 @@ def ResNet_eval(resnet_model,
         for index, filename in enumerate(feat_files):
             csvwriter.writerow([os.path.join(feat_directory, filename)])
 
-        # csv file done
+    # csv file done
     df_eval = pd.read_csv(csv_location)
     file_eval = list(df_eval['path'])
 
@@ -130,7 +142,7 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
     # load the correct model
     if type_of_spec == 'mag':
         if model_version == 'v0':
-            resnet_model.load_state_dict(torch.load(os.path.join(script_dir, config['model_path_spec_mag_v0']), map_location=device), strict=False)
+            resnet_model.load_state_dict(torch.load(os.path.join(script_dir, config['model_path_spec_mag']), map_location=device), strict=False)
     elif type_of_spec == 'pow':
         if model_version == 'v0':
             resnet_model.load_state_dict(torch.load(os.path.join(script_dir, config['model_path_spec_pow_v0']), map_location=device), strict=False)
@@ -153,7 +165,6 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
                                  'eval',
                                  f'probs_ResNet_{model_version}_Ensemble_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
         ResNet_eval(resnet_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature, q_res, q_sen)
-
     else:
         sys.exit(f'Invalid attack combination for {attack}, {attack_model}')
 
@@ -173,13 +184,13 @@ if __name__ == '__main__':
     '''
     attack = 'FGSM'  # 'FGSM' or 'Ensemble'
     attack_model = 'ResNet'  #'ResNet' or 'SENet'
-    epsilon = 0.0
-    dataset = '3s'  # '3s' or 'whole'
+    epsilon = 3.0
+    dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
     feature = 'spec'  #'spec' or 'audio'
-    q_res = None
-    q_sen = None
+    q_res = 30
+    q_sen = 30
 
     '''
     #######################################

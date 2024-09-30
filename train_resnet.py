@@ -19,14 +19,14 @@ import sys
 def main(config, type_of_spec):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
+    script_dir = os.path.dirname(os.path.realpath(__file__))
     assert config['features'] in ['spec', 'mfcc'], 'Not supported feature'
 
     if type_of_spec == 'pow':
-        model_tag = 'model_{}_{}_{}_{}_v0'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+        model_tag = 'model_{}_{}_{}_{}_v1'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
         model_save_path = os.path.join(config['model_folder_pow'], model_tag)
     elif type_of_spec == 'mag':
-        model_tag = 'model_{}_{}_{}_{}_mag_v0'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+        model_tag = 'model_{}_{}_{}_{}_mag'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
         model_save_path = os.path.join(config['model_folder_mag'], model_tag)
     else:
         print('You need to choose what kind of spectrogram you want to work with between power and mag')
@@ -44,8 +44,8 @@ def main(config, type_of_spec):
 
     model = model_cls().to(device)
 
-    df_train = pd.read_csv(config["df_train_path"])
-    df_dev = pd.read_csv(config["df_dev_path"])
+    df_train = pd.read_csv(os.path.join(script_dir, config["df_train_path"]))
+    df_dev = pd.read_csv(os.path.join(script_dir, config["df_dev_path"]))
 
     d_label_trn = dict(zip(df_train['path'], df_train['label']))
     file_train = list(df_train['path'])
@@ -93,11 +93,11 @@ def main(config, type_of_spec):
 if __name__ == '__main__':
 
     seed_everything(1234)
-    set_gpu(-5)
-
-    config_path = 'config/residualnet_train_config.yaml'
+    set_gpu(-1)
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    config_path = os.path.join(script_dir, 'config/residualnet_train_config.yaml')
     config_res = read_yaml(config_path)
 
-    type_of_spec = 'pow' # 'mag'
+    type_of_spec = 'mag' # 'mag'
 
     main(config_res, type_of_spec)
