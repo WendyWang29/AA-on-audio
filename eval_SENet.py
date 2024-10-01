@@ -156,7 +156,7 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
-                                 f'probs_SENet_{model_version}_{attack}_{attack_model}_{dataset}_{epsilon_str}_{type_of_spec}_{feature}.csv')
+                                 f'probs_SENet_{model_version}_{attack}_{attack_model}_{dataset}_norm_{epsilon_str}_{type_of_spec}_{feature}.csv')
         SENet_eval(senet_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
                     feature, q_res, q_sen)
 
@@ -185,13 +185,13 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'FGSM'  # 'FGSM' or 'Ensemble'
-    attack_model = 'SENet'  #'ResNet' or 'SENet'
-    epsilon = 3.0
-    dataset = 'whole'  # '3s' or 'whole'
+    attack = 'BIM'  # 'FGSM' or 'Ensemble'
+    attack_model = 'ResNet1D'  #'ResNet' or 'SENet'
+    epsilon = None
+    dataset = '3s'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
-    feature = 'spec'  #'spec' or 'audio'
+    feature = 'audio'  #'spec' or 'audio'
     q_res = 30
     q_sen = 30
 

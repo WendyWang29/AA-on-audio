@@ -41,9 +41,9 @@ def ResNet_eval(resnet_model,
     if feature == 'audio':
         if attack != 'Ensemble':
             feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
-                                          f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+                                          f'{attack}_{attack_model}_{model_version}_{dataset}_norm_{type_of_spec}_{epsilon_dot_notation}')
             csv_location = os.path.join(script_dir, 'eval',
-                                        f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+                                        f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_norm_{type_of_spec}_{epsilon_dot_notation}')
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
         else:
@@ -56,9 +56,9 @@ def ResNet_eval(resnet_model,
     elif feature == 'spec':
         if attack != 'Ensemble' and attack != None:
             feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
-                                          f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}', 'spec')
+                                          f'{attack}_{attack_model}_{model_version}_{dataset}_norm_{type_of_spec}_{epsilon_dot_notation}', 'spec')
             csv_location = os.path.join(script_dir, 'eval',
-                                        f'list_spec_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+                                        f'list_spec_{attack}_{attack_model}_{model_version}_{dataset}_norm_{type_of_spec}_{epsilon_dot_notation}')
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.npy')]
         else:
@@ -154,7 +154,7 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
-                                 f'probs_ResNet_{model_version}_{attack}_{attack_model}_{dataset}_{epsilon_str}_{type_of_spec}_{feature}.csv')
+                                 f'probs_ResNet_{model_version}_{attack}_{attack_model}_{dataset}_norm_{epsilon_str}_{type_of_spec}_{feature}.csv')
         ResNet_eval(resnet_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
                     feature, q_res, q_sen)
 
@@ -182,13 +182,13 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'FGSM'  # 'FGSM' or 'Ensemble'
-    attack_model = 'ResNet'  #'ResNet' or 'SENet'
-    epsilon = 3.0
-    dataset = 'whole'  # '3s' or 'whole'
+    attack = 'BIM'  # 'FGSM' or 'Ensemble'
+    attack_model = 'ResNet1D'  #'ResNet' or 'SENet'
+    epsilon = None
+    dataset = '3s'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
-    feature = 'spec'  #'spec' or 'audio'
+    feature = 'audio'  #'spec' or 'audio'
     q_res = 30
     q_sen = 30
 

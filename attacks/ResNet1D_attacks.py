@@ -94,7 +94,7 @@ def BIM_ResNet1D(config, model, model_version, dataset, df_eval, device):
         """
         Save audio
         """
-        for m in range(1):
+        for m in range(batch_x.shape[0]):
 
             audio = batch_x[m]
 

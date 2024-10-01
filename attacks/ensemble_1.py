@@ -58,7 +58,7 @@ def EnsembleV1_dataset(epsilon, device, ResNet_model, SENet_model, config, datas
     audio_folder = os.path.join(current_dir, f'Ensemble', audio_folder)
     spec_folder = os.path.join(current_dir, f'Ensemble', audio_folder, 'spec')
 
-    # os.makedirs(audio_folder, exist_ok=True)
+    os.makedirs(audio_folder, exist_ok=True)
     os.makedirs(spec_folder, exist_ok=True)
     print(f'Saving the perturbed audio in {audio_folder}\n')
     print(f'Saving the perturbed spec in {spec_folder}')

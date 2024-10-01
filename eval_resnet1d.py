@@ -39,9 +39,17 @@ def ResNet1D_eval(rawnet_model,
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
 
     if feature == 'audio':
-        if attack != 'Ensemble':
+        if attack != 'Ensemble' and attack != 'BIM':
             feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
                                           f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+            # create list of flac files
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+        elif attack == 'BIM':
+            feat_directory = os.path.join(script_dir, 'attacks',
+                                          f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
+                                          f'{attack}_{attack_model}_{model_version}_{dataset}_norm_{type_of_spec}_{epsilon_dot_notation}')
             csv_location = os.path.join(script_dir, 'eval',
                                         f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
             # create list of flac files
@@ -54,25 +62,10 @@ def ResNet1D_eval(rawnet_model,
                                         f'list_flac_Ensemble_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+    else:
+        sys.exit('This model can only handle as input audio files...')
 
-    elif feature == 'spec':
-        if attack != 'Ensemble':
-            feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
-                                          f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}', 'spec')
-            csv_location = os.path.join(script_dir, 'eval',
-                                        f'list_spec_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
-            # create list of flac files
-            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.npy')]
-        else:
-            assert attack == 'Ensemble', print('Wrong attack')
-            feat_directory = os.path.join(script_dir, 'attacks',
-                                          f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
-                                          f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}',
-                                          'spec')
-            csv_location = os.path.join(script_dir, 'eval',
-                                        f'list_spec_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
-            # create list of flac files
-            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.npy')]
+
 
     if os.path.exists(csv_location):
         os.remove(csv_location)
@@ -178,9 +171,9 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'Ensemble'  # 'FGSM' or 'Ensemble'
-    attack_model = None  #'ResNet' or 'SENet'
-    epsilon = 3.0
+    attack = 'BIM'  # 'FGSM' or 'Ensemble'
+    attack_model = 'ResNet1D'  #'ResNet' or 'SENet' or 'ResNet1D'
+    epsilon = None
     dataset = '3s'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
