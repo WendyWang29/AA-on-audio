@@ -116,29 +116,7 @@ class PowerSpectrogram(nn.Module):
         db_spec = 10 * torch.log10(pow_spec + self.eps)
         return db_spec
 
-class CustomResNet(ResNet):
-    def __init__(self, block, layers, num_classes=1000):
-        super(CustomResNet, self).__init__(block, layers, num_classes=num_classes)
-        self.log_softmax = nn.LogSoftmax(dim=1)
-        #self.PowerSpec = PowerSpectrogram()
 
-    def forward(self, x):
-        #x = self.PowerSpec(x).unsqueeze(dim=0)
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
-        x = self.log_softmax(x)
-        return x
 
 def se_resnet18(num_classes=2):
     """Constructs a ResNet-18 model.
@@ -159,11 +137,25 @@ def se_resnet34(num_classes=2):
 
 def se_resnet341d_custom(num_classes=2):
     """
-    Contructs a CUSTOM ResNet model with log softmax final layer
+    Contructs a CUSTOM ResNet model with power spectrogram input and log softmax final layer
     """
-    model = CustomResNet(SEBasicBlock, [3, 4, 6, 3], num_classes=num_classes)
+    model = ResNet(SEBasicBlock, [3, 4, 6, 3], num_classes=num_classes)
     model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
     model.avgpool = nn.AdaptiveAvgPool2d(1)
+    model.PowerSpec = PowerSpectrogram()
+    model.log_softmax = nn.LogSoftmax(dim=1)
+
+    # temporarily store the original forward method so that we can modify it
+    original_forward = model.forward
+
+    def modified_forward(x):
+        x = model.PowerSpec(x)
+        x = x.unsqueeze(1)
+        x = original_forward(x)
+        x = model.log_softmax(x)
+        return x
+
+    model.forward = modified_forward
     return model
 
 

@@ -25,5 +25,5 @@ def delete_folder_with_progress(folder_path):
     print(f"Folder {folder_path} deleted successfully.")
 
 if __name__ == "__main__":
-    folder_path = 'BIM_ResNet1D_v0_pow'
+    folder_path = 'FGSM_SENet_v0_pow/FGSM_SENet_v0_whole_norm_pow_3dot0'
     delete_folder_with_progress(folder_path)

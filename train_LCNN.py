@@ -74,6 +74,14 @@ def main(config, type_of_spec):
             if valid_loss < best_loss:
                 logger.info(f"Best model found at epoch {epoch}")
                 torch.save(model.state_dict(), os.path.join(model_save_path, config['save_trained_name']))
+
+                # Check if the file exists after saving
+                temp_path = os.path.join(model_save_path, config['save_trained_name'])
+                if os.path.exists(temp_path):
+                    logger.info(f"Model saved successfully at {temp_path}")
+                else:
+                    logger.error(f"Error: Model was not saved at {temp_path}")
+
                 early_stopping = 0
             else:
                 early_stopping += 1

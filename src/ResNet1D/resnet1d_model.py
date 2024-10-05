@@ -127,10 +127,8 @@ class SpectrogramModel1D(nn.Module):
 
     def forward(self, x):
 
-        #x = self.stft(x).unsqueeze(dim=0)
         x = self.PowerSpec(x)
-
-        batch_size = x.size(0)
+        batch_size = x.shape[0]
         x = x.unsqueeze(dim=1)
         out = self.conv1(x)
         out = self.block1(out)

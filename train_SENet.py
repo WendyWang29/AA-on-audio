@@ -62,7 +62,7 @@ def main(config):
     for epoch in range(config['num_epochs']):
         if early_stopping < config['early_stopping']:
             running_loss, train_accuracy = train_epoch_SENet(train_loader, model, config['lr'], device)
-            valid_accuracy = evaluate_accuracy_SENet(dev_loader, model, device)
+            #valid_accuracy = evaluate_accuracy_SENet(dev_loader, model, device)
             valid_auc, valid_eer, valid_accuracy = evaluate_metrics_SENet(dev_loader, model, device)
             valid_loss = get_loss_SENet(dev_loader, model, device)
             writer.add_scalar('train_accuracy', train_accuracy, epoch)

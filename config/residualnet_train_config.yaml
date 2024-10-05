@@ -4,7 +4,7 @@ features: 'spec'
 model_path: ''
 
 save_trained_name: 'best_model_ASVSpoof2019_mag.pth'
-model_folder_pow: 'checkpoints/residualnet_model_v1'
+model_folder_pow: 'checkpoints/residualnet_model_v0'
 model_folder_mag: 'checkpoints/residualnet_model_mag'
 
 batch_size:  64 #128

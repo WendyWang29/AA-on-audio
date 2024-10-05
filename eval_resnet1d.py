@@ -39,7 +39,7 @@ def ResNet1D_eval(rawnet_model,
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
 
     if feature == 'audio':
-        if attack != 'Ensemble' and attack != 'BIM':
+        if attack != 'Ensemble' and attack != 'BIM' and attack != 'Ensemble1D':
             feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
                                           f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
             csv_location = os.path.join(script_dir, 'eval',
@@ -54,12 +54,18 @@ def ResNet1D_eval(rawnet_model,
                                         f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-        else:
-            assert attack == 'Ensemble', print('Wrong attack')
+        elif attack == 'Ensemble':
             feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble',
                                           f'QUANT_ENS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
             csv_location = os.path.join(script_dir, 'eval',
                                         f'list_flac_Ensemble_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+            # create list of flac files
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+        elif attack == 'Ensemble1D':
+            feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble1D',
+                                          f'QUANT_ENS1D_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_flac_Ensemble1D_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
     else:
@@ -138,7 +144,7 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
         sys.exit('Wrong type of spectrogram mode: should be pow or mag')
 
 
-    if attack != 'Ensemble':
+    if attack != 'Ensemble' and attack != 'Ensemble1D':
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
@@ -153,6 +159,14 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
                                  'eval',
                                  f'probs_ResNet1D_{model_version}_Ensemble_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
         ResNet1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature, q_res, q_sen)
+
+    elif attack == 'Ensemble1D':
+        epsilon_str = str(epsilon).replace('.', 'dot')
+        save_path = os.path.join(script_dir,
+                                 'eval',
+                                 f'probs_ResNet1D_{model_version}_Ensemble1D_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
+        ResNet1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature,
+                      q_res, q_sen)
 
     else:
         sys.exit(f'Invalid attack combination for {attack}, {attack_model}')
@@ -171,15 +185,15 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'BIM'  # 'FGSM' or 'Ensemble'
-    attack_model = 'ResNet1D'  #'ResNet' or 'SENet' or 'ResNet1D'
-    epsilon = None
-    dataset = '3s'  # '3s' or 'whole'
+    attack = 'FGSM'  # 'FGSM' or 'Ensemble'
+    attack_model = 'SENet'  #'ResNet' or 'SENet' or 'ResNet1D'
+    epsilon = 3.0
+    dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
     feature = 'audio'  # RawNet can only work with audio files
-    q_res = 10
-    q_sen = 10
+    q_res = 10  # first model
+    q_sen = 10  # second model
 
     '''
     #######################################

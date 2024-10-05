@@ -20,7 +20,7 @@ def FGSM_SENet(epsilon, config, model, model_version, dataset, type_of_spec, df_
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
     # ex. audio folder: 'FGSM_SENet_v0_3s_pow_3dot0'
-    audio_folder = f'FGSM_SENet_{model_version}_{dataset}_norm_{type_of_spec}_{epsilon_str}'
+    audio_folder = f'FGSM_SENet_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
     audio_folder = os.path.join(current_dir, f'FGSM_SENet_{model_version}_{type_of_spec}', audio_folder)
     spec_folder = os.path.join(current_dir, f'FGSM_SENet_{model_version}_{type_of_spec}', audio_folder, 'spec')
 

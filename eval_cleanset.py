@@ -1,6 +1,16 @@
 import logging
 
 from src.SENet.SENet_model import se_resnet34_custom
+from src.resnet_model import SpectrogramModel
+from src.LCNN_model.LCNN_model import LCNN
+
+from torch.utils.data import DataLoader
+from src.resnet_utils import LoadEvalData_ResNet, LoadEvalData_ResNet_SPEC
+from src.utils import *
+from tqdm import tqdm
+import csv
+import sys
+import os
 
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('tensorflow').setLevel(logging.WARNING)
@@ -8,19 +18,6 @@ logging.getLogger('numba').setLevel(logging.WARNING)
 
 logger = logging.getLogger("add_challenge")
 logger.setLevel(logging.INFO)
-import pandas as pd
-from tensorboardX import SummaryWriter
-from torch.utils.data import DataLoader
-from src.resnet_model import SpectrogramModel
-from src.resnet_utils import LoadEvalData_ResNet, LoadEvalData_ResNet_SPEC
-from src.utils import *
-from tqdm import tqdm
-import csv
-import sys
-import re
-from sklearn import model_selection
-import os
-
 
 def init_eval(model, model_version, type_of_spec, dataset):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -46,6 +43,7 @@ def init_eval(model, model_version, type_of_spec, dataset):
                     strict=False)
         else:
             sys.exit('Wrong type of spectrogram mode: should be pow or mag')
+
     elif model == 'SENet':
         save_path = os.path.join(script_dir,
                                  'eval',
@@ -65,8 +63,28 @@ def init_eval(model, model_version, type_of_spec, dataset):
                     strict=False)
         else:
             sys.exit('Wrong type of spectrogram mode: should be pow or mag')
+
+    elif model == 'LCNN':
+        save_path = os.path.join(script_dir,
+                                 'eval',
+                                 f'probs_LCNN_{model_version}_clean_{dataset}_{type_of_spec}_{feature}.csv')
+        lcnn_model = LCNN().to(device)
+        config_path = os.path.join(script_dir, 'config/LCNN.yaml')
+        config = read_yaml(config_path)
+        if type_of_spec == 'mag':
+            if model_version == 'v0':
+                lcnn_model.load_state_dict(
+                    torch.load(os.path.join(script_dir, config['model_path_spec_mag_v0']), map_location=device),
+                    strict=False)
+        elif type_of_spec == 'pow':
+            if model_version == 'v0':
+                lcnn_model.load_state_dict(
+                    torch.load(os.path.join(script_dir, config['model_path_spec_pow_v0']), map_location=device),
+                    strict=False)
+        else:
+            sys.exit('Wrong type of spectrogram mode: should be pow or mag')
     else:
-        sys.exit('Wrong, TODO')
+        sys.exit('Wrong model, TODO')
 
     if dataset == 'whole' and feature == 'audio':
         feat_directory = '/nas/public/dataset/asvspoof2019/LA/ASVspoof2019_LA_eval/flac/'
@@ -75,8 +93,11 @@ def init_eval(model, model_version, type_of_spec, dataset):
                                     f'list_{feature}_{model}_{model_version}_{dataset}_{type_of_spec}')
     elif dataset == 'whole' and feature == 'mag_spec':
         sys.exit('TODO')
-    elif dataset == '3s':
-        sys.exit('TODO')
+    elif dataset == '3s' and feature == 'audio':
+        feat_directory = 'attacks/reduced_dataset'
+        feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+        csv_location = os.path.join(script_dir, 'eval',
+                                    f'list_{feature}_{model}_{model_version}_{dataset}_{type_of_spec}')
 
     if os.path.exists(csv_location):
         os.remove(csv_location)
@@ -134,6 +155,7 @@ def init_eval(model, model_version, type_of_spec, dataset):
                         row = [utt_id[i], probabilities[i, 0], probabilities[i, 1]]
                         writer.writerow(row)
             print('Scores saved to {}'.format(save_path))
+
     elif model == 'SENet':
         senet_model.eval()
 
@@ -144,6 +166,28 @@ def init_eval(model, model_version, type_of_spec, dataset):
                 # score_list = []
                 feat_batch = feat_batch.to(torch.float32).to(device)
                 score = senet_model(feat_batch.unsqueeze(dim=1))
+                probabilities = torch.exp(score)
+                probabilities = probabilities.detach().cpu().numpy()
+
+                with open(save_path, mode='a+', newline='') as file:
+                    writer = csv.writer(file)
+                    if file.tell() == 0:
+                        writer.writerow(['Filename', 'Pred.class 0', 'Pred.class 1'])
+                    for i in range(len(utt_id)):
+                        row = [utt_id[i], probabilities[i, 0], probabilities[i, 1]]
+                        writer.writerow(row)
+            print('Scores saved to {}'.format(save_path))
+
+    elif model == 'LCNN':
+        lcnn_model.eval()
+
+        with torch.no_grad():
+
+            for feat_batch, utt_id in tqdm(feat_loader, total=len(feat_loader)):
+                # fname_list = []
+                # score_list = []
+                feat_batch = feat_batch.to(torch.float32).to(device)
+                score = lcnn_model(feat_batch)
                 probabilities = torch.exp(score)
                 probabilities = probabilities.detach().cpu().numpy()
 
@@ -173,10 +217,10 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    model = 'ResNet'
+    model = 'LCNN'
     model_version = 'v0'
     type_of_spec = 'pow'   # 'mag', 'pow'
-    dataset = 'whole'   # '3s', 'whole'
+    dataset = '3s'   # '3s', 'whole'
     '''
     #######################################
     '''

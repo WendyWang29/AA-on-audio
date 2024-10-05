@@ -23,7 +23,7 @@ def main(config, type_of_spec):
     assert config['features'] in ['spec', 'mfcc'], 'Not supported feature'
 
     if type_of_spec == 'pow':
-        model_tag = 'model_{}_{}_{}_{}_v1'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+        model_tag = 'model_{}_{}_{}_{}_v0'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
         model_save_path = os.path.join(config['model_folder_pow'], model_tag)
     elif type_of_spec == 'mag':
         model_tag = 'model_{}_{}_{}_{}_mag'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
@@ -98,6 +98,6 @@ if __name__ == '__main__':
     config_path = os.path.join(script_dir, 'config/residualnet_train_config.yaml')
     config_res = read_yaml(config_path)
 
-    type_of_spec = 'mag' # 'mag'
+    type_of_spec = 'mag' # 'mag' or 'pow'
 
     main(config_res, type_of_spec)

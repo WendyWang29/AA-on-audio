@@ -209,7 +209,7 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'Ensemble'   #'FGSM' or 'BIM'
+    attack = 'Ensemble'
     dataset = '3s'  # '3s' or 'whole'
     model_version = 'v0' # or 'old'
     epsilon = None

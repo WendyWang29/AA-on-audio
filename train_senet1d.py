@@ -60,7 +60,7 @@ def main(config):
     for epoch in range(config['num_epochs']):
         if early_stopping < config['early_stopping']:
             running_loss, train_accuracy = train_epoch_rawnet(data_loader=train_loader, model=model, device=device)
-            valid_accuracy = evaluate_accuracy_rawnet(dev_loader, model, device)
+            #valid_accuracy = evaluate_accuracy_rawnet(dev_loader, model, device)
             valid_auc, valid_eer, valid_accuracy = evaluate_metrics(dev_loader, model, device)
             valid_loss = get_loss_resnet(dev_loader, model, device)
             writer.add_scalar('train_accuracy', train_accuracy, epoch)
@@ -73,6 +73,14 @@ def main(config):
             if valid_loss < best_loss:
                 logger.info(f"Best model found at epoch {epoch}")
                 torch.save(model.state_dict(), os.path.join(model_save_path, config['save_trained_name']))
+
+                # Check if the file exists after saving
+                temp_path = os.path.join(model_save_path, config['save_trained_name'])
+                if os.path.exists(temp_path):
+                    logger.info(f"Model saved successfully at {temp_path}")
+                else:
+                    logger.error(f"Error: Model was not saved at {temp_path}")
+
                 early_stopping = 0
             else:
                 early_stopping += 1
