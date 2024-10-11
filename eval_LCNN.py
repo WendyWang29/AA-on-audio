@@ -35,7 +35,7 @@ def LCNN_eval(lcnn_model,
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
 
     if feature == 'audio':
-        if attack != 'Ensemble' and attack != 'Ensemble1D':
+        if attack != 'Ensemble' and attack != 'Ensemble1D' and attack != 'Ensemble1D_RS':
             feat_directory = os.path.join(script_dir, 'attacks',
                                           f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
                                           f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
@@ -59,6 +59,15 @@ def LCNN_eval(lcnn_model,
                                         f'list_flac_Ensemble1D_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+
+        elif attack == 'Ensemble1D_RS':
+            feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble1D_RS',
+                                          f'QUANT_ENS1D_RS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_flac_Ensemble1D_RS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+            # create list of flac files
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+
     elif feature == 'spec':
         if attack != 'Ensemble' and attack != None:
             feat_directory = os.path.join(script_dir, 'attacks',
@@ -155,14 +164,13 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
     else:
         sys.exit('Wrong type of spectrogram mode: should be pow or mag')
 
-    if attack != 'Ensemble' and attack != 'Ensemble1D':
+    if attack != 'Ensemble' and attack != 'Ensemble1D' and attack != 'Ensemble1D_RS':
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
                                  f'probs_LCNN_{model_version}_{attack}_{attack_model}_{dataset}_{epsilon_str}_{type_of_spec}_{feature}.csv')
         LCNN_eval(lcnn_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
                   feature, q_res, q_sen)
-
 
     elif attack == 'Ensemble':
         epsilon_str = str(epsilon).replace('.', 'dot')
@@ -177,6 +185,14 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
         save_path = os.path.join(script_dir,
                                  'eval',
                                  f'probs_LCNN_{model_version}_Ensemble1D_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
+        LCNN_eval(lcnn_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
+                  feature, q_res, q_sen)
+
+    elif attack == 'Ensemble1D_RS':
+        epsilon_str = str(epsilon).replace('.', 'dot')
+        save_path = os.path.join(script_dir,
+                                 'eval',
+                                 f'probs_LCNN_{model_version}_Ensemble1D_RS_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
         LCNN_eval(lcnn_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
                   feature, q_res, q_sen)
 
@@ -196,8 +212,8 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'Ensemble1D'  # 'FGSM' or 'Ensemble'
-    attack_model = None  # 'ResNet' or 'SENet'
+    attack = 'BIM'  # 'FGSM' or 'Ensemble'
+    attack_model = 'ResNet1D'  # 'ResNet' or 'SENet'
     epsilon = None
     dataset = '3s'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model

@@ -2,7 +2,7 @@ from src.rawnet_utils import LoadAttackData_RawNet
 from src.utils import *
 import os
 import gc
-from src.ResNet1D.resnet1d_model import SpectrogramModel1D
+from src.SENet.senet1d_model import se_resnet341d_custom
 
 
 from torch.utils.data import DataLoader
@@ -15,14 +15,14 @@ from attacks.sp_utils import spectrogram_inversion_batch
 from attacks_utils import save_perturbed_audio, save_perturbed_spec
 
 
-def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device):
+def BIM_SENet1D(config, epsilon, model, model_version, dataset, df_eval, device):
 
     epsilon_str = str(epsilon).replace('.', 'dot')
     type_of_spec = 'pow'  # this was inside the model....
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
-    audio_folder = f'BIM_ResNet1D_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
-    audio_folder = os.path.join(current_dir, f'BIM_ResNet1D_{model_version}_{type_of_spec}', audio_folder)
+    audio_folder = f'BIM_SENet1D_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
+    audio_folder = os.path.join(current_dir, f'BIM_SENet1D_{model_version}_{type_of_spec}', audio_folder)
 
     os.makedirs(audio_folder, exist_ok=True)
     print(f'Saving the perturbed audio in {audio_folder}...\n')
@@ -42,8 +42,7 @@ def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
     L = nn.NLLLoss()
 
     n_iters = 100  # max number of BIM iterations
-    alpha = epsilon/n_iters  # perturbation to add at each iteration
-    print(f'Using n_iters={n_iters} and alpha={alpha}\n')
+    alpha = 0.001  # perturbation to add at each iteration
     # win_length = 2048
     # n_fft = 2048
     # hop_length = 512
@@ -62,7 +61,6 @@ def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
         batch_x.requires_grad = True
 
         with tqdm(total=n_iters, desc='BIM iteration', leave=False) as pbar:
-            effectiveness_percentage = 0
             for i in range(n_iters):
 
                 out = model(batch_x)
@@ -80,7 +78,8 @@ def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
                 effectiveness = wrong_predictions.float().mean()
                 effectiveness_percentage = effectiveness * 100
 
-                pbar.set_description(f'BIM iter {i + 1}/{n_iters} | Effectiveness: {effectiveness_percentage:.2f}%')
+                if effectiveness_percentage >= 99:
+                    break
 
                 batch_x = pert_batch.detach().clone()
                 batch_x.requires_grad = True
@@ -104,7 +103,7 @@ def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
                                  sr=16000,
                                  attack=attack,
                                  epsilon=epsilon,
-                                 model='ResNet1D',
+                                 model='SENet1D',
                                  model_version=model_version,
                                  type_of_spec=type_of_spec)
         del batch_x
@@ -121,7 +120,7 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
-    config_path = os.path.join(script_dir, '../config/resnet1d.yaml')
+    config_path = os.path.join(script_dir, '../config/senet1d.yaml')
     config = read_yaml(config_path)
 
     '''
@@ -129,7 +128,7 @@ if __name__ == '__main__':
     '''
     attack = 'BIM'   #'FGSM' or 'BIM'
     dataset = 'whole'  # '3s' or 'whole'
-    epsilon = 0.02
+    epsilon = None
     model_version = 'v0' # or 'old'
     type_of_spec = 'pow'   # 'pow' or 'mag'
     '''
@@ -147,7 +146,7 @@ if __name__ == '__main__':
         sys.exit(f'You need to define the dataset to work on, {dataset} is not valid')
 
 
-    model = SpectrogramModel1D().to(device)
+    model = se_resnet341d_custom(num_classes=2).to(device)
 
     if model_version == 'v0':
         model.load_state_dict(torch.load(os.path.join(script_dir, '..', config['model_path_spec_pow_v0']), map_location=device))
@@ -158,11 +157,11 @@ if __name__ == '__main__':
         sys.exit()
 
     model.eval()
-    print(f'ResNet model loaded with weights of version {model_version}\n'
+    print(f'SENet1D model loaded with weights of version {model_version}\n'
           f'{attack} will be performed with epsilon = {epsilon}, on dataset: {dataset}, using {type_of_spec} spectrograms')
 
 
-    BIM_ResNet1D(config,
+    BIM_SENet1D(config,
                  epsilon,
                  model,
                  model_version,

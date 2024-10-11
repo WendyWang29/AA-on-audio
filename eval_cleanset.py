@@ -19,15 +19,15 @@ logging.getLogger('numba').setLevel(logging.WARNING)
 logger = logging.getLogger("add_challenge")
 logger.setLevel(logging.INFO)
 
-def init_eval(model, model_version, type_of_spec, dataset):
+def init_eval(model, model_version, type_of_spec, dataset, feature):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    feature = 'audio'
 
+    # LOAD MODELS AND DEFINE SAVE PATH
     if model == 'ResNet':
         save_path = os.path.join(script_dir,
                                  'eval',
-                                 f'probs_ResNet_{model_version}_clean_{dataset}_{type_of_spec}_{feature}.csv')
+                                 f'probs_ResNet2D_{model_version}_clean_{dataset}_{type_of_spec}_{feature}.csv')
         resnet_model = SpectrogramModel().to(device)
         config_path = os.path.join(script_dir, 'config/residualnet_train_config.yaml')
         config = read_yaml(config_path)
@@ -47,7 +47,7 @@ def init_eval(model, model_version, type_of_spec, dataset):
     elif model == 'SENet':
         save_path = os.path.join(script_dir,
                                  'eval',
-                                 f'probs_SENet_{model_version}_clean_{dataset}_{type_of_spec}_{feature}.csv')
+                                 f'probs_SENet2D_{model_version}_clean_{dataset}_{type_of_spec}_{feature}.csv')
         senet_model = se_resnet34_custom(num_classes=2).to(device)
         config_path = os.path.join(script_dir, 'config/SENet.yaml')
         config = read_yaml(config_path)
@@ -86,18 +86,27 @@ def init_eval(model, model_version, type_of_spec, dataset):
     else:
         sys.exit('Wrong model, TODO')
 
-    if dataset == 'whole' and feature == 'audio':
-        feat_directory = '/nas/public/dataset/asvspoof2019/LA/ASVspoof2019_LA_eval/flac/'
-        feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-        csv_location = os.path.join(script_dir, 'eval',
-                                    f'list_{feature}_{model}_{model_version}_{dataset}_{type_of_spec}')
-    elif dataset == 'whole' and feature == 'mag_spec':
-        sys.exit('TODO')
-    elif dataset == '3s' and feature == 'audio':
-        feat_directory = 'attacks/reduced_dataset'
-        feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-        csv_location = os.path.join(script_dir, 'eval',
-                                    f'list_{feature}_{model}_{model_version}_{dataset}_{type_of_spec}')
+
+    if feature == 'audio':
+        if dataset == 'whole' and type_of_spec == 'pow':
+            feat_directory = '/nas/public/dataset/asvspoof2019/LA/ASVspoof2019_LA_eval/flac/'
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_{feature}_{model}_{model_version}_{dataset}_{type_of_spec}')
+        elif dataset == '3s' and type_of_spec == 'pow':
+            feat_directory = 'attacks/reduced_dataset'
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_{feature}_{model}_{model_version}_{dataset}_{type_of_spec}')
+    elif feature == 'spec':
+        if dataset == 'whole' and type_of_spec == 'pow':
+            feat_directory = 'attacks/whole_dataset_pow_specs'
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.npy')]
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_{feature}_{model}_{model_version}_{dataset}_{type_of_spec}')
+        else:
+            print('TODO, spec and 3s is a TODO')
+
 
     if os.path.exists(csv_location):
         os.remove(csv_location)
@@ -123,7 +132,6 @@ def init_eval(model, model_version, type_of_spec, dataset):
 
 
     if feature == 'spec':
-        sys.exit('TODO for spec')
         feat_set = LoadEvalData_ResNet_SPEC(list_IDs=file_eval, win_len=config_res['win_len'], config=config,
                                             type_of_spec=type_of_spec)
     elif feature == 'audio':
@@ -217,12 +225,13 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    model = 'LCNN'
+    model = 'SENet1D'
     model_version = 'v0'
     type_of_spec = 'pow'   # 'mag', 'pow'
-    dataset = '3s'   # '3s', 'whole'
+    dataset = 'whole'   # '3s', 'whole'
+    feature = 'audio'  # spec or audio
     '''
     #######################################
     '''
 
-    init_eval(model, model_version, type_of_spec, dataset)
+    init_eval(model, model_version, type_of_spec, dataset, feature)

@@ -24,10 +24,10 @@ def main(config, type_of_spec):
 
     if type_of_spec == 'pow':
         model_tag = 'model_{}_{}_{}_{}_v0'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
-        model_save_path = os.path.join(config['model_folder_pow'], model_tag)
+        model_save_path = os.path.join(script_dir, config['model_folder_pow'], model_tag)
     elif type_of_spec == 'mag':
-        model_tag = 'model_{}_{}_{}_{}_mag'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
-        model_save_path = os.path.join(config['model_folder_mag'], model_tag)
+        model_tag = 'model_{}_{}_{}_{}_v0_mag'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+        model_save_path = os.path.join(script_dir, config['model_folder_mag'], model_tag)
     else:
         print('You need to choose what kind of spectrogram you want to work with between power and mag')
         sys.exit()
@@ -93,7 +93,7 @@ def main(config, type_of_spec):
 if __name__ == '__main__':
 
     seed_everything(1234)
-    set_gpu(-1)
+    set_gpu(5)
     script_dir = os.path.dirname(os.path.realpath(__file__))
     config_path = os.path.join(script_dir, 'config/residualnet_train_config.yaml')
     config_res = read_yaml(config_path)

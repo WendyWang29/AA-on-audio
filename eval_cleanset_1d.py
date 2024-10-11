@@ -127,7 +127,7 @@ def init_eval(model, model_version, type_of_spec, dataset):
 
     feat_loader = DataLoader(feat_set, batch_size=config['eval_batch_size'], shuffle=False, num_workers=15)
 
-    if model == 'ResNet1D' or model == 'RawNet':
+    if model == 'ResNet1D' or model == 'RawNet' or model == 'SENet1D':
         model1d.eval()
 
         with torch.no_grad():
@@ -149,7 +149,7 @@ def init_eval(model, model_version, type_of_spec, dataset):
                         writer.writerow(row)
             print('Scores saved to {}'.format(save_path))
     else:
-        sys.exit('Todo')
+        sys.exit(f'Wrong model {model}')
 
 
 
@@ -171,7 +171,7 @@ if __name__ == '__main__':
     model = 'SENet1D'
     model_version = 'v0'
     type_of_spec = 'pow'   # 'mag', 'pow'
-    dataset = '3s'   # '3s', 'whole'
+    dataset = 'whole'   # '3s', 'whole'
     '''
     #######################################
     '''

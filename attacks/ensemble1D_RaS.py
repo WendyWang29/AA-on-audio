@@ -2,8 +2,9 @@ from src.rawnet_utils import LoadAttackData_RawNet
 from src.utils import *
 import os
 import gc
-from src.ResNet1D.resnet1d_model import SpectrogramModel1D
+
 from src.SENet.senet1d_model import se_resnet341d_custom
+from src.rawnet2_model import RawNet
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -15,40 +16,41 @@ from attacks.sp_utils import spectrogram_inversion_batch
 from attacks_utils import save_perturbed_audio
 
 
-def Ensemble1D_RS(dataset,
+def Ensemble1D_RaS(dataset,
                   df_eval,
                   model_version,
                   device,
                   type_of_spec,
-                  q_res,
+                  q_raw,
                   q_sen):
     torch.backends.cudnn.enabled = False
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
     script_dir_up = os.path.dirname(script_dir)
 
-    config_path_res = os.path.join(script_dir, '../config/resnet1d.yaml')
-    config_res = read_yaml(config_path_res)
-
-    config_path_sen = os.path.join(script_dir, '../config/senet1d.yaml')
+    config_path_sen = os.path.join(script_dir, '../config/resnet1d.yaml')
     config_sen = read_yaml(config_path_sen)
 
+    config_path_raw = os.path.join(script_dir, '../config/rawnet2.yaml')
+    config_raw = read_yaml(config_path_raw)
+
     # load the models
-    res_model = SpectrogramModel1D().to(device)
+    model_cls = RawNet(config['model'], device)
+    raw_model = model_cls.to(device)
     sen_model = se_resnet341d_custom(num_classes=2).to(device)
 
-    res_model.load_state_dict(
-        torch.load(os.path.join(script_dir_up, config_res['model_path_spec_pow_v0']), map_location=device))
+    raw_model.load_state_dict(
+        torch.load(os.path.join(script_dir_up, config_raw['model_path_spec_pow_v0']), map_location=device))
     sen_model.load_state_dict(
-        torch.load(os.path.join(script_dir_up, config_sen['model_path_spec_pow_v0']), map_location=device),
+        torch.load(os.path.join(script_dir_up, config_raw['model_path_spec_pow_v0']), map_location=device),
         strict=False)
 
-    res_model.eval()
+    raw_model.eval()
     sen_model.eval()
 
     # save folder for the audio
-    audio_folder = f'QUANT_ENS1D_RS_{model_version}_{q_res}_{q_sen}_{dataset}_None'
+    audio_folder = f'QUANT_ENS1D_RaS_{model_version}_{q_raw}_{q_sen}_{dataset}_None'
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    audio_folder = os.path.join(current_dir, f'Ensemble1D_RS', audio_folder)
+    audio_folder = os.path.join(current_dir, f'Ensemble1D_RaS', audio_folder)
 
     os.makedirs(audio_folder, exist_ok=True)
     print(f'Saving the perturbed audio in {audio_folder}\n')
@@ -59,7 +61,7 @@ def Ensemble1D_RS(dataset,
 
     feat_set = LoadAttackData_RawNet(list_IDs=file_eval,
                                      labels=labels_eval,
-                                     config=config_sen)
+                                     config=config_raw)
     data_loader = DataLoader(feat_set,
                              batch_size=config['eval_batch_size'],
                              shuffle=False,
@@ -93,11 +95,11 @@ def Ensemble1D_RS(dataset,
                 '''
                 compute the gradients of the 2 models
                 '''
-                out_res = res_model(batch_x)
-                loss_res = L(out_res, batch_y)
-                res_model.zero_grad()
-                loss_res.backward()
-                grad_res = batch_x.grad.data
+                out_raw = raw_model(batch_x)
+                loss_raw = L(out_raw, batch_y)
+                raw_model.zero_grad()
+                loss_raw.backward()
+                grad_raw = batch_x.grad.data
 
                 out_sen = sen_model(batch_z)
                 loss_sen = L(out_sen, batch_y)
@@ -108,23 +110,23 @@ def Ensemble1D_RS(dataset,
                 '''
                 compute absolute values
                 '''
-                abs_grad_res = torch.abs(grad_res)
+                abs_grad_raw = torch.abs(grad_raw)
                 abs_grad_sen = torch.abs(grad_sen)
 
                 '''
                 find the thresholds
                 '''
-                thresh_res = torch.quantile(abs_grad_res, q_res / 100)
+                thresh_raw = torch.quantile(abs_grad_raw, q_raw / 100)
                 thresh_sen = torch.quantile(abs_grad_sen, q_sen / 100)
 
                 '''
                 create new grad
                 '''
                 # create new matrix initiated with infinity
-                matrix = torch.full_like(grad_res, float('inf'))
+                matrix = torch.full_like(grad_raw, float('inf'))
 
                 # populate with important values from grad_res
-                matrix[abs_grad_res > thresh_res] = grad_res[abs_grad_res > thresh_res]
+                matrix[abs_grad_raw > thresh_raw] = grad_raw[abs_grad_raw > thresh_raw]
 
                 # populate with important values from grad_sen, if overlapping value take the min
                 mask = abs_grad_sen > thresh_sen
@@ -140,14 +142,14 @@ def Ensemble1D_RS(dataset,
                 '''
                 pert_batch = batch_x + alpha * grad.sign()
 
-                # effectiveness on ResNet
-                p_batch_out_res = res_model(pert_batch)
-                pred_labels_res = torch.argmax(p_batch_out_res, dim=1)
-                wrong_predictions_res = (pred_labels_res != batch_y)
-                effect_res = wrong_predictions_res.float().mean()
-                effect_perc_res = effect_res * 100
-
                 # effectiveness on RawNet
+                p_batch_out_raw = raw_model(pert_batch)
+                pred_labels_raw = torch.argmax(p_batch_out_raw, dim=1)
+                wrong_predictions_raw = (pred_labels_raw != batch_y)
+                effect_raw = wrong_predictions_raw.float().mean()
+                effect_perc_raw = effect_raw * 100
+
+                # effectiveness on SENet
                 p_batch_out_sen = sen_model(pert_batch)
                 pred_labels_sen = torch.argmax(p_batch_out_sen, dim=1)
                 wrong_predictions_sen = (pred_labels_sen != batch_y)
@@ -155,7 +157,7 @@ def Ensemble1D_RS(dataset,
                 effect_perc_sen = effect_sen * 100
 
                 # early stopping
-                if (effect_perc_res > 70) and (effect_perc_sen > 70):
+                if (effect_perc_raw > 70) and (effect_perc_sen > 70):
                     break
 
                 batch_x = pert_batch.detach().clone()
@@ -163,7 +165,7 @@ def Ensemble1D_RS(dataset,
                 batch_z = pert_batch.detach().clone()
                 batch_z.requires_grad = True
 
-                del grad_res, grad_sen, abs_grad_res, abs_grad_sen, grad, matrix
+                del grad_raw, grad_sen, abs_grad_raw, abs_grad_sen, grad, matrix
 
                 if i % 10 == 0:
                     torch.cuda.empty_cache()
@@ -185,16 +187,16 @@ def Ensemble1D_RS(dataset,
                                  folder=audio_folder,
                                  audio=audio,
                                  sr=16000,
-                                 attack=f'EnsembleBIM_RS_{q_res}_{q_sen}',
+                                 attack=f'EnsembleBIM_RaS_{q_raw}_{q_sen}',
                                  epsilon=epsilon,
-                                 model='ResSen',
+                                 model='RawSen',
                                  model_version=model_version,
                                  type_of_spec=type_of_spec)
         del batch_x, batch_z
 
         time_taken = time.time() - start_time
         tqdm.write(
-            f'Time taken: {time_taken:.3f} | stopped at iter: {i} | Res effect: {effect_perc_res:.2f}%, SEN effect: {effect_perc_sen:.2f}%')
+            f'Time taken: {time_taken:.3f} | stopped at iter: {i} | Res effect: {effect_perc_raw:.2f}%, SEN effect: {effect_perc_sen:.2f}%')
         torch.cuda.empty_cache()
         gc.collect()
 
@@ -207,19 +209,19 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'Ensemble1D_RS'
+    attack = 'Ensemble1D_RaS'  # RawNet2 x SENet1D ensemble attack
     dataset = '3s'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'
     epsilon = None
     type_of_spec = 'pow'  # 'pow' or 'mag'
-    q_res = 10
+    q_raw = 10
     q_sen = 10
     '''
     #######################################
     '''
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
-    config_path = os.path.join(script_dir, '../config/resnet1d.yaml')
+    config_path = os.path.join(script_dir, '../config/senet1d.yaml')
     config = read_yaml(config_path)
 
     # load the dataset to work on
@@ -232,10 +234,10 @@ if __name__ == '__main__':
     else:
         sys.exit(f'You need to define the dataset to work on, {dataset} is not valid')
 
-    Ensemble1D_RS(dataset,
+    Ensemble1D_RaS(dataset,
                   df_eval,
                   model_version,
                   device,
                   type_of_spec,
-                  q_res,
+                  q_raw,
                   q_sen)
