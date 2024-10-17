@@ -194,8 +194,8 @@ if __name__ == '__main__':
     ########## INSERT PARAMETERS ##########
     '''
     attack = 'BIM'  # 'FGSM' or 'Ensemble'
-    attack_model = 'SENet1D'  #'ResNet' or 'SENet' or 'ResNet1D'
-    epsilon = None
+    attack_model = 'ResNet2D'  #'ResNet' or 'SENet' or 'ResNet1D'
+    epsilon = 3.0
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'

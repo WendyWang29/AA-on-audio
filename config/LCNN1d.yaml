@@ -1,0 +1,18 @@
+features: 'waveform'
+num_epochs: 100
+batch_size: 64
+eval_batch_size: 64
+lr: 1e-04
+
+model_path: ''
+save_trained_name: 'LCNN1D_model_ASVSpoof2019_v0.pth'
+model_folder: 'checkpoints/LCNN1D_model_v0'
+
+df_train_path: 'data/df_train.csv'
+df_dev_path: 'data/df_dev.csv'
+df_eval_path: 'data/df_eval_19.csv'
+df_eval_path_3s: 'data/df_eval_19_3s.csv'
+
+early_stopping: 10
+
+model_path_spec_pow_v0: 'checkpoints/LCNN1D_model_v0/model_waveform_100_64_1e-04_v0/LCNN1D_model_ASVSpoof2019_v0.pth'

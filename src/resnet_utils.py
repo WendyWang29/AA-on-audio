@@ -202,7 +202,10 @@ def get_features(wav_path, features, args, type_of_spec, cached=False, force=Fal
         else:
             raise ValueError('Feature type not supported.')
 
-        return spec, phase, audio_len
+        max_abs = np.max(np.abs(X))
+        mean = np.mean(X)
+
+        return spec, phase, audio_len, max_abs, mean
 
     #####################################
     # if cached:
@@ -224,9 +227,9 @@ def get_features(wav_path, features, args, type_of_spec, cached=False, force=Fal
     #         np.save(file_name, data)
     #     return data
 
-    spec, phase, audio_len = get_feats(wav_path, type_of_spec)
+    spec, phase, audio_len, max_abs, mean = get_feats(wav_path, type_of_spec)
 
-    return spec, phase, audio_len
+    return spec, phase, audio_len, max_abs, mean
 
 
 class LoadAttackData_ResNet(Dataset):
@@ -250,12 +253,12 @@ class LoadAttackData_ResNet(Dataset):
         y = self.labels[track]  # get the corresponding GT labels
 
         # get_features takes the audio and cuts it to 47104 samples (length is like so for the STFT computations...)
-        X, phase, audio_len = get_features(wav_path=track,
-                                           features=self.config['features'],
-                                           args=self.config,
-                                           type_of_spec=self.type_of_spec,
-                                           cached=False,
-                                           force=False)
+        X, phase, audio_len, max_abs, mean = get_features(wav_path=track,
+                                                          features=self.config['features'],
+                                                          args=self.config,
+                                                          type_of_spec=self.type_of_spec,
+                                                          cached=False,
+                                                          force=False)
 
         # network_input_shape = 28 * self.win_len
         #
@@ -267,7 +270,7 @@ class LoadAttackData_ResNet(Dataset):
         # X_win = X[:, : network_input_shape]
         # X_win = Tensor(X_win)
 
-        return X, y, phase, audio_len, index
+        return X, y, phase, audio_len, index, max_abs, mean
 
 
 class LoadTrainData_ResNet(Dataset):
@@ -289,12 +292,12 @@ class LoadTrainData_ResNet(Dataset):
     def __getitem__(self, index):
         track = self.list_IDs[index]
         y = self.labels[track]
-        X, _, _ = get_features(wav_path=track,
-                               features=self.config['features'],
-                               args=self.config,
-                               type_of_spec=self.type_of_spec,
-                               cached=False,
-                               force=False)
+        X, _, _, _, _ = get_features(wav_path=track,
+                                     features=self.config['features'],
+                                     args=self.config,
+                                     type_of_spec=self.type_of_spec,
+                                     cached=False,
+                                     force=False)
 
         return X, y
 
@@ -315,12 +318,12 @@ class LoadEvalData_ResNet(Dataset):
 
     def __getitem__(self, index):
         track = self.list_IDs[index]
-        X, _, _ = get_features(wav_path=track,
-                               features=self.config['features'],
-                               args=self.config,
-                               type_of_spec=self.type_of_spec,
-                               cached=False,
-                               force=False)
+        X, _, _, _, _ = get_features(wav_path=track,
+                                     features=self.config['features'],
+                                     args=self.config,
+                                     type_of_spec=self.type_of_spec,
+                                     cached=False,
+                                     force=False)
 
         return X, track
 

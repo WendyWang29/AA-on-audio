@@ -1,5 +1,6 @@
 import logging
 
+from src.LCNN_model.LCNN1d_model import LCNN1D
 from src.rawnet_utils import LoadEvalData_RawNet
 
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
@@ -85,6 +86,25 @@ def init_eval(model, model_version, type_of_spec, dataset):
                     torch.load(os.path.join(script_dir, config['model_path_spec_pow_v0']), map_location=device),
                     strict=False)
 
+    elif model == 'LCNN1D':
+        save_path = os.path.join(script_dir,
+                                 'eval',
+                                 f'probs_LCNN1D_{model_version}_clean_{dataset}_{type_of_spec}_{feature}.csv')
+        config_path = os.path.join(script_dir, 'config/LCNN1d.yaml')
+        config = read_yaml(config_path)
+        model1d = LCNN1D().to(device)
+        if type_of_spec == 'mag':
+            if model_version == 'v0':
+                model1d.load_state_dict(
+                    torch.load(os.path.join(script_dir, config['model_path_spec_mag']), map_location=device),
+                    strict=False)
+        elif type_of_spec == 'pow':
+            if model_version == 'v0':
+                model1d.load_state_dict(
+                    torch.load(os.path.join(script_dir, config['model_path_spec_pow_v0']), map_location=device),
+                    strict=False)
+
+
     else:
         sys.exit('Unknown model')
 
@@ -127,7 +147,7 @@ def init_eval(model, model_version, type_of_spec, dataset):
 
     feat_loader = DataLoader(feat_set, batch_size=config['eval_batch_size'], shuffle=False, num_workers=15)
 
-    if model == 'ResNet1D' or model == 'RawNet' or model == 'SENet1D':
+    if model == 'ResNet1D' or model == 'RawNet' or model == 'SENet1D' or model == 'LCNN1D':
         model1d.eval()
 
         with torch.no_grad():
@@ -168,7 +188,7 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    model = 'SENet1D'
+    model = 'RawNet'
     model_version = 'v0'
     type_of_spec = 'pow'   # 'mag', 'pow'
     dataset = 'whole'   # '3s', 'whole'

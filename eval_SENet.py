@@ -198,7 +198,7 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
 
 if __name__ == '__main__':
     seed_everything(1234)
-    set_gpu(5)
+    set_gpu(-1)
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
     config_path = os.path.join(script_dir, 'config/SENet.yaml')
@@ -208,8 +208,8 @@ if __name__ == '__main__':
     ########## INSERT PARAMETERS ##########
     '''
     attack = 'BIM'  # 'FGSM' or 'Ensemble'
-    attack_model = 'ResNet1D'  #'ResNet' or 'SENet'
-    epsilon = None
+    attack_model = 'LCNN2D'  #'ResNet' or 'SENet'
+    epsilon = 3.0
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'

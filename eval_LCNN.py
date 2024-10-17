@@ -214,8 +214,8 @@ if __name__ == '__main__':
     '''
     attack = 'BIM'  # 'FGSM' or 'Ensemble'
     attack_model = 'ResNet1D'  # 'ResNet' or 'SENet'
-    epsilon = None
-    dataset = '3s'  # '3s' or 'whole'
+    epsilon = 0.02
+    dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
     feature = 'audio'  # 'spec' or 'audio'

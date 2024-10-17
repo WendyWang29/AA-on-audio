@@ -14,15 +14,14 @@ import sys
 from attacks.sp_utils import spectrogram_inversion_batch
 from attacks_utils import save_perturbed_audio, save_perturbed_spec
 
-
-def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device):
+def PGD_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device):
 
     epsilon_str = str(epsilon).replace('.', 'dot')
     type_of_spec = 'pow'  # this was inside the model....
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
-    audio_folder = f'BIM_ResNet1D_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
-    audio_folder = os.path.join(current_dir, f'BIM_ResNet1D_{model_version}_{type_of_spec}', audio_folder)
+    audio_folder = f'PGD_ResNet1D_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
+    audio_folder = os.path.join(current_dir, f'PGD_ResNet1D_{model_version}_{type_of_spec}', audio_folder)
 
     os.makedirs(audio_folder, exist_ok=True)
     print(f'Saving the perturbed audio in {audio_folder}...\n')
@@ -41,7 +40,7 @@ def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
     del feat_set
     L = nn.NLLLoss()
 
-    n_iters = 100  # max number of BIM iterations
+    n_iters = 10  # max number of BIM iterations
     alpha = epsilon/n_iters  # perturbation to add at each iteration
     print(f'Using n_iters={n_iters} and alpha={alpha}\n')
     # win_length = 2048
@@ -51,7 +50,7 @@ def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
     # window = 'hann'
 
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
-    print('The BIM attack starts...\n')
+    print('The PGD attack starts...\n')
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
 
     for batch_x, batch_y, audio_len, index in tqdm(data_loader, total=len(data_loader)):
@@ -61,7 +60,11 @@ def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
         batch_y = batch_y.to(device)
         batch_x.requires_grad = True
 
-        with tqdm(total=n_iters, desc='BIM iteration', leave=False) as pbar:
+        # Step 1: Random Initialization within epsilon-ball
+        pert_batch = batch_x + torch.empty_like(batch_x).uniform_(-epsilon, epsilon).to(device)
+        pert_batch = torch.clamp(pert_batch, 0, 1)  # Ensure inputs are in valid range (e.g., between 0 and 1 for audio)
+
+        with tqdm(total=n_iters, desc='PGD iteration', leave=False) as pbar:
             effectiveness_percentage = 0
             for i in range(n_iters):
 
@@ -71,7 +74,10 @@ def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
                 loss.backward()
                 grad = batch_x.grad.data
 
-                pert_batch = batch_x + alpha * grad.sign()
+                pert_batch = pert_batch + alpha * grad.sign()
+                # Step 3: Projection back to the epsilon-ball
+                perturbation = torch.clamp(pert_batch - batch_x, -epsilon, epsilon)  # Project the perturbation
+                pert_batch = torch.clamp(batch_x + perturbation, 0, 1)  # Ensure perturbed input stays in valid range
 
                 # early stopping
                 out_pert = model(pert_batch)
@@ -115,9 +121,123 @@ def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
         gc.collect()
 
 
+def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device):
+
+    epsilon_str = str(epsilon).replace('.', 'dot')
+    type_of_spec = 'pow'  # this was inside the model....
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+
+    audio_folder = f'BIM_ResNet1D_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
+    audio_folder = os.path.join(current_dir, f'BIM_ResNet1D_{model_version}_{type_of_spec}', audio_folder)
+
+    os.makedirs(audio_folder, exist_ok=True)
+    print(f'Saving the perturbed audio in {audio_folder}...\n')
+
+    # data loader
+    file_eval = list(df_eval['path'])
+    labels_eval = dict(zip(df_eval['path'], df_eval['label']))
+
+    feat_set = LoadAttackData_RawNet(list_IDs=file_eval,
+                                     labels=labels_eval,
+                                     config=config)
+    data_loader = DataLoader(feat_set,
+                             batch_size=config['eval_batch_size'],
+                             shuffle=False,
+                             num_workers=15)
+    del feat_set
+    L = nn.NLLLoss()
+
+    n_iters = 50  # max number of BIM iterations
+    alpha = epsilon/n_iters  # perturbation to add at each iteration
+    print(f'Using n_iters={n_iters} and alpha={alpha}\n')
+    # win_length = 2048
+    # n_fft = 2048
+    # hop_length = 512
+    # eps = 1e-20
+    # window = 'hann'
+
+    print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
+    print('The BIM attack starts...\n')
+    print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
+
+    for batch_x, batch_y, audio_len, index, max_abs, mean in tqdm(data_loader, total=len(data_loader)):
+        start_time = time.time()
+
+        max_abs = max_abs.numpy()
+        mean = mean.numpy()
+
+        batch_x = batch_x.to(device)
+        batch_y = batch_y.to(device)
+        batch_x.requires_grad = True
+
+        with tqdm(total=n_iters, desc='BIM iteration', leave=False) as pbar:
+            effectiveness_percentage = 0
+            for i in range(n_iters):
+
+                out = model(batch_x)
+                loss = L(out, batch_y)
+                model.zero_grad()
+                loss.backward()
+                grad = batch_x.grad.data
+
+                pert_batch = batch_x + alpha * grad.sign()
+
+                out_pert = model(pert_batch)
+                predicted_labels = torch.argmax(out_pert, dim=1)
+                wrong_predictions = (predicted_labels != batch_y)
+                effectiveness = wrong_predictions.float().mean()
+                effectiveness_percentage = effectiveness * 100
+
+                pbar.set_description(f'BIM iter {i + 1}/{n_iters} | Effectiveness: {effectiveness_percentage:.2f}%')
+
+                batch_x = pert_batch.detach().clone()
+                batch_x.requires_grad = True
+
+                pbar.update(1)
+
+        pbar.refresh()
+        batch_x = batch_x.squeeze(0).detach().cpu().numpy()
+
+        """
+        Save audio
+        """
+        for m in range(batch_x.shape[0]):
+
+            # get the single perturbed audio
+            audio = batch_x[m]
+            clean_max_abs = max_abs[m]
+            clean_mean = mean[m]
+
+            # normalize to have the same max abs value
+            pert_max_abs = np.max(np.abs(audio))
+            if pert_max_abs > 0:  # avoid division by 0
+                audio = audio * (clean_max_abs / pert_max_abs)
+
+            # same mean
+            pert_mean = np.mean(audio)
+            audio = audio + (clean_mean - pert_mean)
+
+
+            save_perturbed_audio(file=file_eval[index[m]],
+                                 folder=audio_folder,
+                                 audio=audio,
+                                 sr=16000,
+                                 attack=attack,
+                                 epsilon=epsilon,
+                                 model='ResNet1D',
+                                 model_version=model_version,
+                                 type_of_spec=type_of_spec)
+        del batch_x
+
+        time_taken = time.time() - start_time
+        tqdm.write(
+            f'Time taken: {time_taken:.3f} | stopped at iter. {i} | effectiveness percentage: {effectiveness_percentage:.2f}%')
+        gc.collect()
+
+
 if __name__ == '__main__':
     seed_everything(1234)
-    set_gpu(5)
+    set_gpu(-1)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
@@ -129,12 +249,13 @@ if __name__ == '__main__':
     '''
     attack = 'BIM'   #'FGSM' or 'BIM'
     dataset = 'whole'  # '3s' or 'whole'
-    epsilon = 0.02
+    epsilon = 0.025
     model_version = 'v0' # or 'old'
     type_of_spec = 'pow'   # 'pow' or 'mag'
     '''
     #######################################
     '''
+
 
     # load the dataset to work on
     if dataset == 'whole':

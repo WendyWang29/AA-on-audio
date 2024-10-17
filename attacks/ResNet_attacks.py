@@ -25,9 +25,10 @@ def BIM_ResNet(epsilon,
 
     # create the folder for the perturbed dataset
     current_dir = os.path.dirname(os.path.abspath(__file__))
+    epsilon_str = str(epsilon).replace('.', 'dot')
 
     # audio and spec folder
-    audio_folder = f'BIM_ResNet2D_{model_version}_{dataset}_{type_of_spec}'
+    audio_folder = f'BIM_ResNet2D_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
     audio_folder = os.path.join(current_dir, f'BIM_ResNet2D_{model_version}_{type_of_spec}', audio_folder)
     spec_folder = os.path.join(current_dir, f'BIM_ResNet2D_{model_version}_{type_of_spec}', audio_folder, 'spec')
 
@@ -64,10 +65,13 @@ def BIM_ResNet(epsilon,
     print('The BIM 2D attack on ResNet starts...\n')
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
 
-    for batch_x, batch_y, phase, audio_len, index in tqdm(data_loader, total=len(data_loader)):
+    for batch_x, batch_y, phase, audio_len, index,max_abs, mean in tqdm(data_loader, total=len(data_loader)):
         start_time = time.time()
 
         phase = phase.numpy()
+        max_abs = max_abs.numpy()
+        mean = mean.numpy()
+
         batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
         batch_x.requires_grad = True
@@ -88,15 +92,8 @@ def BIM_ResNet(epsilon,
                 effectiveness = wrong_predictions.float().mean()
                 effectiveness_percentage = effectiveness * 100
 
-                # if effectiveness_percentage >= 100:
-                #     break
-
                 batch_x = pert_batch.detach().clone()
                 batch_x.requires_grad = True
-
-                # if i % 10 == 0:
-                #     torch.cuda.empty_cache()
-                #     gc.collect()
 
                 pbar.update(1)
 
@@ -137,12 +134,24 @@ def BIM_ResNet(epsilon,
                                         center=True)
 
             if type_of_spec == 'pow':
-                recon_audio = librosa.util.normalize(recon_audio)
+                '''
+                normalization process
+                '''
+                clean_max_abs = max_abs[m]
+                clean_mean = mean[m]
+                # normalize to have the same max abs value
+                pert_max_abs = np.max(np.abs(recon_audio))
+                if pert_max_abs > 0:  # avoid division by 0
+                    recon_audio = recon_audio * (clean_max_abs / pert_max_abs)
+                # same mean
+                pert_mean = np.mean(recon_audio)
+                recon_audio = recon_audio + (clean_mean - pert_mean)
             else:
                 pass
 
             # cut the audio to original audio length
             sliced_audio = recon_audio[:audio_len[m]]
+
 
             save_perturbed_audio(file=file_eval[index[m]],
                                  folder=audio_folder,

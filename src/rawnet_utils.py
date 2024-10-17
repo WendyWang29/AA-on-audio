@@ -176,7 +176,10 @@ class LoadAttackData_RawNet(Dataset):
         else:
             X = X[:net_input_length]
 
+        max_abs = np.max(np.abs(X))
+        mean = np.mean(X)
+
         assert len(X) == net_input_length, f'Wrong length of input: {len(X)} is not 47104'
 
-        return X, y, audio_len, index
+        return X, y, audio_len, index, max_abs, mean
 

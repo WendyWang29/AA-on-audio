@@ -1,9 +1,8 @@
+from src.LCNN_model.LCNN1d_model import LCNN1D
 from src.rawnet_utils import LoadAttackData_RawNet
 from src.utils import *
 import os
 import gc
-from src.SENet.senet1d_model import se_resnet341d_custom
-
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -11,18 +10,17 @@ import torch.nn as nn
 import librosa
 import time
 import sys
-from attacks.sp_utils import spectrogram_inversion_batch
 from attacks_utils import save_perturbed_audio, save_perturbed_spec
 
 
-def BIM_SENet1D(config, epsilon, model, model_version, dataset, df_eval, device):
 
+def BIM_LCNN1D(config, epsilon, model, model_version, dataset, df_eval, device):
     epsilon_str = str(epsilon).replace('.', 'dot')
     type_of_spec = 'pow'  # this was inside the model....
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
-    audio_folder = f'BIM_SENet1D_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
-    audio_folder = os.path.join(current_dir, f'BIM_SENet1D_{model_version}_{type_of_spec}', audio_folder)
+    audio_folder = f'BIM_LCNN1D_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
+    audio_folder = os.path.join(current_dir, f'BIM_LCNN1D_{model_version}_{type_of_spec}', audio_folder)
 
     os.makedirs(audio_folder, exist_ok=True)
     print(f'Saving the perturbed audio in {audio_folder}...\n')
@@ -42,7 +40,7 @@ def BIM_SENet1D(config, epsilon, model, model_version, dataset, df_eval, device)
     L = nn.NLLLoss()
 
     n_iters = 50  # max number of BIM iterations
-    alpha = epsilon/n_iters  # perturbation to add at each iteration
+    alpha = epsilon / n_iters  # perturbation to add at each iteration
     print(f'Using n_iters={n_iters} and alpha={alpha}\n')
     # win_length = 2048
     # n_fft = 2048
@@ -54,11 +52,16 @@ def BIM_SENet1D(config, epsilon, model, model_version, dataset, df_eval, device)
     print('The BIM attack starts...\n')
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
 
-    for batch_x, batch_y, audio_len, index, max_abs, mean in tqdm(data_loader, total=len(data_loader)):
+    for batch_x, batch_y, audio_len, index in tqdm(data_loader, total=len(data_loader)):
         start_time = time.time()
 
-        max_abs = max_abs.numpy()
-        mean = mean.numpy()
+        min_val = torch.min(batch_x)
+        max_val = torch.max(batch_x)
+        normalized_audio = 2 * (batch_x - min_val) / (max_val - min_val) - 1
+
+        # Scale the normalized audio to range [0, 1 - val]
+        scaled_audio = normalized_audio * (1 - epsilon)
+        batch_x = scaled_audio
 
         batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
@@ -67,7 +70,6 @@ def BIM_SENet1D(config, epsilon, model, model_version, dataset, df_eval, device)
         with tqdm(total=n_iters, desc='BIM iteration', leave=False) as pbar:
             effectiveness_percentage = 0
             for i in range(n_iters):
-
                 out = model(batch_x)
                 loss = L(out, batch_y)
                 model.zero_grad()
@@ -75,7 +77,7 @@ def BIM_SENet1D(config, epsilon, model, model_version, dataset, df_eval, device)
                 grad = batch_x.grad.data
 
                 pert_batch = batch_x + alpha * grad.sign()
-                #pert_batch = torch.clamp(pert_batch, 0, 1) # clamp so it stays between 0 and 1
+                # pert_batch = torch.clamp(pert_batch, 0, 1) # clamp so it stays between 0 and 1
 
                 out_pert = model(pert_batch)
                 predicted_labels = torch.argmax(out_pert, dim=1)
@@ -98,20 +100,8 @@ def BIM_SENet1D(config, epsilon, model, model_version, dataset, df_eval, device)
         Save audio
         """
         for m in range(batch_x.shape[0]):
-
-            # get the single perturbed audio
             audio = batch_x[m]
-            clean_max_abs = max_abs[m]
-            clean_mean = mean[m]
-
-            # normalize to have the same max abs value
-            pert_max_abs = np.max(np.abs(audio))
-            if pert_max_abs > 0:  # avoid division by 0
-                audio = audio * (clean_max_abs / pert_max_abs)
-
-            # same mean
-            pert_mean = np.mean(audio)
-            audio = audio + (clean_mean - pert_mean)
+            audio = librosa.util.normalize(audio)
 
             save_perturbed_audio(file=file_eval[index[m]],
                                  folder=audio_folder,
@@ -119,7 +109,7 @@ def BIM_SENet1D(config, epsilon, model, model_version, dataset, df_eval, device)
                                  sr=16000,
                                  attack=attack,
                                  epsilon=epsilon,
-                                 model='SENet1D',
+                                 model='LCNN1D',
                                  model_version=model_version,
                                  type_of_spec=type_of_spec)
         del batch_x
@@ -136,17 +126,17 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
-    config_path = os.path.join(script_dir, '../config/senet1d.yaml')
+    config_path = os.path.join(script_dir, '../config/LCNN1d.yaml')
     config = read_yaml(config_path)
 
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'BIM'   #'FGSM' or 'BIM'
+    attack = 'BIM'  # 'FGSM' or 'BIM'
     dataset = 'whole'  # '3s' or 'whole'
-    epsilon = 0.006
-    model_version = 'v0' # or 'old'
-    type_of_spec = 'pow'   # 'pow' or 'mag'
+    epsilon = 0.005
+    model_version = 'v0'  # or 'old'
+    type_of_spec = 'pow'  # 'pow' or 'mag'
     '''
     #######################################
     '''
@@ -161,26 +151,26 @@ if __name__ == '__main__':
     else:
         sys.exit(f'You need to define the dataset to work on, {dataset} is not valid')
 
-
-    model = se_resnet341d_custom(num_classes=2).to(device)
+    model = LCNN1D().to(device)
 
     if model_version == 'v0':
-        model.load_state_dict(torch.load(os.path.join(script_dir, '..', config['model_path_spec_pow_v0']), map_location=device))
+        model.load_state_dict(
+            torch.load(os.path.join(script_dir, '..', config['model_path_spec_pow_v0']), map_location=device))
     elif model_version == 'old':
-        model.load_state_dict(torch.load(os.path.join(script_dir, '..', config['model_path_spec_pow']), map_location=device))
+        model.load_state_dict(
+            torch.load(os.path.join(script_dir, '..', config['model_path_spec_pow']), map_location=device))
     else:
         print(f'{model_version} is not defined')
         sys.exit()
 
     model.eval()
-    print(f'SENet1D model loaded with weights of version {model_version}\n'
+    print(f'ResNet model loaded with weights of version {model_version}\n'
           f'{attack} will be performed with epsilon = {epsilon}, on dataset: {dataset}, using {type_of_spec} spectrograms')
 
-
-    BIM_SENet1D(config,
-                 epsilon,
-                 model,
-                 model_version,
-                 dataset,
-                 df_eval,
-                 device)
+    BIM_LCNN1D(config,
+               epsilon,
+               model,
+               model_version,
+               dataset,
+               df_eval,
+               device)

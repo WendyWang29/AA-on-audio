@@ -1,25 +1,29 @@
 import logging
 
+from src.LCNN_model.LCNN1d_model import LCNN1D
+
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('tensorflow').setLevel(logging.WARNING)
 logging.getLogger('numba').setLevel(logging.WARNING)
 
 logger = logging.getLogger("add_challenge")
 logger.setLevel(logging.INFO)
-
+import pandas as pd
+from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
-from src.SENet.senet1d_model import se_resnet341d_custom
+
 from src.rawnet_utils import LoadEvalData_RawNet
 from src.utils import *
 from tqdm import tqdm
 import csv
 import sys
-
+import re
+from sklearn import model_selection
 import os
 
 
 
-def SENet1D_eval(senet1d_model,
+def LCNN1D_eval(senet1d_model,
                 save_path,
                 device,
                 config,
@@ -37,51 +41,60 @@ def SENet1D_eval(senet1d_model,
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
 
     if feature == 'audio':
-        if attack != 'Ensemble' and attack != 'BIM' and attack != 'Ensemble1D' and attack != 'Ensemble1D_RaS' and attack != 'Ensemble1D_RS':
-            feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
-                                          f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
-            csv_location = os.path.join(script_dir, 'eval',
-                                        f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
-            # create list of flac files
-            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-        elif attack == 'BIM':
+        if attack == 'BIM':
             feat_directory = os.path.join(script_dir, 'attacks',
                                           f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
                                           f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
             csv_location = os.path.join(script_dir, 'eval',
-                                        f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+                                                f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-        elif attack == 'Ensemble':
-            feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble',
-                                          f'QUANT_ENS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-            csv_location = os.path.join(script_dir, 'eval',
-                                        f'list_flac_Ensemble_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-            # create list of flac files
-            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-        elif attack == 'Ensemble1D':
-            feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble1D',
-                                          f'QUANT_ENS1D_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-            csv_location = os.path.join(script_dir, 'eval',
-                                        f'list_flac_Ensemble1D_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-            # create list of flac files
-            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-        elif attack == 'Ensemble1D_RS':
-            feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble1D_RS',
-                                          f'QUANT_ENS1D_RS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-            csv_location = os.path.join(script_dir, 'eval',
-                                        f'list_flac_Ensemble1D_RS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-            # create list of flac files
-            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-        elif attack == 'Ensemble1D_RaS':
-            feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble1D_RaS',
-                                          f'QUANT_ENS1D_RaS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-            csv_location = os.path.join(script_dir, 'eval',
-                                        f'list_flac_Ensemble1D_RaS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-            # create list of flac files
-            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-    else:
-        sys.exit('This model can only handle as input audio files...')
+
+    #     if attack != 'Ensemble' and attack != 'BIM' and attack != 'Ensemble1D' and attack != 'Ensemble1D_RaS' and attack != 'Ensemble1D_RS':
+    #         feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
+    #                                       f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+    #         csv_location = os.path.join(script_dir, 'eval',
+    #                                     f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+    #         # create list of flac files
+    #         feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+    #     elif attack == 'BIM':
+    #         feat_directory = os.path.join(script_dir, 'attacks',
+    #                                       f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
+    #                                       f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+    #         csv_location = os.path.join(script_dir, 'eval',
+    #                                     f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+    #         # create list of flac files
+    #         feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+    #     elif attack == 'Ensemble':
+    #         feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble',
+    #                                       f'QUANT_ENS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+    #         csv_location = os.path.join(script_dir, 'eval',
+    #                                     f'list_flac_Ensemble_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+    #         # create list of flac files
+    #         feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+    #     elif attack == 'Ensemble1D':
+    #         feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble1D',
+    #                                       f'QUANT_ENS1D_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+    #         csv_location = os.path.join(script_dir, 'eval',
+    #                                     f'list_flac_Ensemble1D_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+    #         # create list of flac files
+    #         feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+    #     elif attack == 'Ensemble1D_RS':
+    #         feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble1D_RS',
+    #                                       f'QUANT_ENS1D_RS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+    #         csv_location = os.path.join(script_dir, 'eval',
+    #                                     f'list_flac_Ensemble1D_RS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+    #         # create list of flac files
+    #         feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+    #     elif attack == 'Ensemble1D_RaS':
+    #         feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble1D_RaS',
+    #                                       f'QUANT_ENS1D_RaS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+    #         csv_location = os.path.join(script_dir, 'eval',
+    #                                     f'list_flac_Ensemble1D_RaS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
+    #         # create list of flac files
+    #         feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+    # else:
+    #     sys.exit('This model can only handle as input audio files...')
 
 
 
@@ -140,7 +153,7 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
 
-    model = se_resnet341d_custom(num_classes=2).to(device)
+    model = LCNN1D().to(device)
 
     if model_version != 'v0':
         sys.exit(f'Version {model_version} is not accepted')
@@ -160,8 +173,8 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
-                                 f'probs_SENet1D_{model_version}_{attack}_{attack_model}_{dataset}_{epsilon_str}_{type_of_spec}_{feature}.csv')
-        SENet1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
+                                 f'probs_LCNN1D_{model_version}_{attack}_{attack_model}_{dataset}_{epsilon_str}_{type_of_spec}_{feature}.csv')
+        LCNN1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
                     feature, q_res, q_sen)
 
 
@@ -169,8 +182,8 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
-                                 f'probs_SENet1D_{model_version}_{attack}_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
-        SENet1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature, q_res, q_sen)
+                                 f'probs_LCNN1D_{model_version}_{attack}_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
+        LCNN1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature, q_res, q_sen)
 
 
     else:
@@ -184,7 +197,7 @@ if __name__ == '__main__':
     set_gpu(-1)
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
-    config_path = os.path.join(script_dir, 'config/senet1d.yaml')
+    config_path = os.path.join(script_dir, 'config/LCNN1d.yaml')
     config = read_yaml(config_path)
 
     '''
@@ -199,6 +212,7 @@ if __name__ == '__main__':
     feature = 'audio'  # SeNet1d can only work with 1d inputs
     q_res = 10  # first model
     q_sen = 10  # second model
+
 
 
 

@@ -24,7 +24,7 @@ def init_eval(model, model_version, type_of_spec, dataset, feature):
     script_dir = os.path.dirname(os.path.realpath(__file__))
 
     # LOAD MODELS AND DEFINE SAVE PATH
-    if model == 'ResNet':
+    if model == 'ResNet2D':
         save_path = os.path.join(script_dir,
                                  'eval',
                                  f'probs_ResNet2D_{model_version}_clean_{dataset}_{type_of_spec}_{feature}.csv')
@@ -44,7 +44,7 @@ def init_eval(model, model_version, type_of_spec, dataset, feature):
         else:
             sys.exit('Wrong type of spectrogram mode: should be pow or mag')
 
-    elif model == 'SENet':
+    elif model == 'SENet2D':
         save_path = os.path.join(script_dir,
                                  'eval',
                                  f'probs_SENet2D_{model_version}_clean_{dataset}_{type_of_spec}_{feature}.csv')
@@ -64,7 +64,7 @@ def init_eval(model, model_version, type_of_spec, dataset, feature):
         else:
             sys.exit('Wrong type of spectrogram mode: should be pow or mag')
 
-    elif model == 'LCNN':
+    elif model == 'LCNN2D':
         save_path = os.path.join(script_dir,
                                  'eval',
                                  f'probs_LCNN_{model_version}_clean_{dataset}_{type_of_spec}_{feature}.csv')
@@ -142,7 +142,7 @@ def init_eval(model, model_version, type_of_spec, dataset, feature):
 
     feat_loader = DataLoader(feat_set, batch_size=config_res['eval_batch_size'], shuffle=False, num_workers=15)
 
-    if model == 'ResNet':
+    if model == 'ResNet2D':
         resnet_model.eval()
 
         with torch.no_grad():
@@ -164,7 +164,7 @@ def init_eval(model, model_version, type_of_spec, dataset, feature):
                         writer.writerow(row)
             print('Scores saved to {}'.format(save_path))
 
-    elif model == 'SENet':
+    elif model == 'SENet2D':
         senet_model.eval()
 
         with torch.no_grad():
@@ -186,7 +186,7 @@ def init_eval(model, model_version, type_of_spec, dataset, feature):
                         writer.writerow(row)
             print('Scores saved to {}'.format(save_path))
 
-    elif model == 'LCNN':
+    elif model == 'LCNN2D':
         lcnn_model.eval()
 
         with torch.no_grad():
@@ -207,6 +207,8 @@ def init_eval(model, model_version, type_of_spec, dataset, feature):
                         row = [utt_id[i], probabilities[i, 0], probabilities[i, 1]]
                         writer.writerow(row)
             print('Scores saved to {}'.format(save_path))
+    else:
+        sys.exit('Unknown model: {}'.format(model))
 
 
 
@@ -225,11 +227,11 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    model = 'SENet1D'
+    model = 'ResNet2D'
     model_version = 'v0'
     type_of_spec = 'pow'   # 'mag', 'pow'
     dataset = 'whole'   # '3s', 'whole'
-    feature = 'audio'  # spec or audio
+    feature = 'spec'  # spec or audio
     '''
     #######################################
     '''
