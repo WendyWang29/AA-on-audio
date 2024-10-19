@@ -16,35 +16,25 @@ import sys
 from attacks.sp_utils import spectrogram_inversion_batch
 from attacks_utils import save_perturbed_audio
 
-def plot_gaussian(grad):
-    # input is a tensor
-    grad = grad[:5]
-    grad = grad.cpu().numpy().flatten()
-    plt.figure(figsize=(10, 6))
-    plt.hist(grad, bins=100, alpha=0.5, label='grad gaussian', color='blue', density=True)
-    plt.title('Gaussian Distribution of grad_res and grad_sen (First 5 Rows)')
-    plt.xlabel('Gradient Values')
-    plt.ylabel('Density')
-    plt.legend()
 
-    plt.show()
 
 def Ens1D_ResSEN(config_sen,
                  model_res,
                  model_sen,
-                 epsilon,
                  model_version,
                  dataset,
                  df_eval,
                  device,
-                 q_res,
-                 q_sen):
+                 q_res, q_sen, eps_res, eps_sen):
 
-    epsilon_str = str(epsilon).replace('.', 'dot')
+    torch.backends.cudnn.enabled = False
+    epsilon_str_res = str(eps_res).replace('.', 'dot')
+    epsilon_str_sen = str(eps_sen).replace('.', 'dot')
+
     type_of_spec = 'pow'  # this was inside the model....
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
-    audio_folder = f'Ens1D_ResSEN_{model_version}_{dataset}_{type_of_spec}_{q_res}_{q_sen}_{epsilon_str}'
+    audio_folder = f'Ens1D_ResSEN_{model_version}_{dataset}_{type_of_spec}_{q_res}_{q_sen}_{epsilon_str_res}_{epsilon_str_sen}'
     audio_folder = os.path.join(current_dir,
                                 f'Ens1D_ResSEN_{model_version}_{type_of_spec}', audio_folder)
 
@@ -65,46 +55,30 @@ def Ens1D_ResSEN(config_sen,
     del feat_set
     L = nn.NLLLoss()
 
-    n_iters = 50  # max number of BIM iterations
-    alpha = epsilon/n_iters  # perturbation to add at each iteration
-    print(f'Using epsilon = {epsilon}, n_iters={n_iters} and alpha={alpha}\n')
+    # parameters
+    n_iters = 50
+    alpha_res = eps_res / n_iters
+    alpha_sen = eps_sen / n_iters
+    print(f'Using n_iters={n_iters}')
 
-    # win_length = 2048
-    # n_fft = 2048
-    # hop_length = 512
-    # eps = 1e-20
-    # window = 'hann'
 
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
     print('The Ensemble attack on ResNet and SENet starts...\n')
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
 
     for batch_x, batch_y, audio_len, index, max_abs, mean in tqdm(data_loader, total=len(data_loader)):
-        start_time = time.time()
 
         max_abs = max_abs.numpy()
         mean = mean.numpy()
 
-        w_sen = 0
-        w_res = 1.0
-
-        min_val = torch.min(batch_x)
-        max_val = torch.max(batch_x)
-        normalized_audio = 2 * (batch_x - min_val) / (max_val - min_val) - 1
-
-        # Scale the normalized audio to range [-1 + eps, 1 - eps]
-        scaled_audio = normalized_audio * (1 - epsilon)
-        batch_x = scaled_audio
-
-        batch_x = batch_x.to(device)
         batch_z = batch_x.clone().to(device)
+        batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
 
         batch_x.requires_grad = True
         batch_z.requires_grad = True
 
         with tqdm(total=n_iters, desc='BIM iteration', leave=False) as pbar:
-            effectiveness_percentage = 0
             for i in range(n_iters):
 
                 out_sen = model_sen(batch_x)
@@ -127,40 +101,59 @@ def Ens1D_ResSEN(config_sen,
                 '''
                 compute thresholds
                 '''
-                abs_grad_sen = torch.abs(grad_sen)
-                abs_grad_res = torch.abs(grad_res)
-                thresh_sen = torch.quantile(abs_grad_sen, q_sen/100)
-                thresh_res = torch.quantile(abs_grad_res, q_res/100)
+                thresh_res = torch.quantile(torch.abs(grad_res), q_res / 100)
+                thresh_sen = torch.quantile(torch.abs(grad_sen), q_sen / 100)
+
+                mask_res = torch.abs(grad_res) > thresh_res
+                mask_sen = torch.abs(grad_sen) > thresh_sen
 
                 '''
                 create new grad
                 '''
-                # matrix = torch.full_like(grad_sen, float('inf'))
-                #
-                # # Masks for values that exceed the threshold
-                # mask_sen = abs_grad_sen > thresh_sen
-                # mask_res = abs_grad_res > thresh_res
-                #
-                # # Overlap where both grad_res and grad_sen exceed their thresholds
-                # overlap = mask_sen & mask_res
-                #
-                # # For overlapping values, compute the mean of grad_res and grad_sen
-                # matrix[overlap] = (w_res * grad_res[overlap] + w_sen * grad_sen[overlap]) / 2
-                #
-                #
-                # # For non-overlapping values, take grad_sen values where only grad_sen exceeds the threshold
-                # matrix[mask_sen & ~overlap] = w_sen * grad_sen[mask_sen & ~overlap]
-                #
-                # # For non-overlapping values, take grad_res values where only grad_res exceeds the threshold
-                # matrix[mask_res & ~overlap] = w_res *grad_res[mask_res & ~overlap]
-                #
-                # # replace inf with 0
-                # matrix[matrix == float('inf')] = 0
-                #
-                # grad = matrix
+                overlap_mask = mask_res & mask_sen  # intersection
 
-                pert_batch = batch_x + alpha * grad_res.sign()
-                #pert_batch = torch.clamp(pert_batch, 0, 1) # clamp so it stays between 0 and 1
+                # Take the sign of grad_res and grad_raw for non-overlapping and apply corresponding alpha
+                pert_batch = batch_x.clone()  # Clone batch_x to pert_batch
+
+                # Apply alpha_res to grad_res for non-overlapping areas
+                pert_batch[mask_res & ~overlap_mask] += alpha_res * grad_res[mask_res & ~overlap_mask].sign()
+
+                # Apply alpha_sen to grad_raw for non-overlapping areas
+                pert_batch[mask_sen & ~overlap_mask] += alpha_sen * grad_sen[mask_sen & ~overlap_mask].sign()
+
+                '''
+                Handle overlapping values: half from grad_res, half from grad_raw
+                '''
+                if overlap_mask.sum() > 0:
+                    # Get overlapping values for grad_res and grad_raw
+                    overlap_values_res = grad_res[overlap_mask]
+                    overlap_values_sen = grad_sen[overlap_mask]
+
+                    # Sort the absolute values and get the indices for sorting
+                    sorted_res_idx = torch.argsort(torch.abs(overlap_values_res), descending=True)
+                    sorted_sen_idx = torch.argsort(torch.abs(overlap_values_sen), descending=True)
+
+                    # Split indices in half: top half from grad_res, top half from grad_raw
+                    n_overlap = overlap_values_res.numel()
+                    half_size = n_overlap // 2
+
+                    # Take half of the top values from grad_res
+                    top_res_idx = sorted_res_idx[:half_size]
+
+                    # Take half of the top values from grad_raw
+                    top_sen_idx = sorted_sen_idx[:half_size]
+
+                    # Initialize new gradient for the overlapping mask
+                    new_overlap_grad = torch.zeros_like(overlap_values_res)
+
+                    # Assign top values from grad_res
+                    new_overlap_grad[top_res_idx] = alpha_res * overlap_values_res[top_res_idx].sign()
+
+                    # Assign top values from grad_raw
+                    new_overlap_grad[top_sen_idx] = alpha_sen * overlap_values_sen[top_sen_idx].sign()
+
+                    # Update pert_batch with the new values for overlapping region
+                    pert_batch[overlap_mask] += new_overlap_grad
 
                 out_pert_sen = model_sen(pert_batch)
                 predicted_labels_sen = torch.argmax(out_pert_sen, dim=1)
@@ -179,6 +172,8 @@ def Ens1D_ResSEN(config_sen,
                 batch_x = batch_z = pert_batch.detach().clone()
                 batch_x.requires_grad = True
                 batch_z.requires_grad = True
+
+                del grad_res, grad_sen
 
                 pbar.update(1)
 
@@ -210,8 +205,8 @@ def Ens1D_ResSEN(config_sen,
                                  audio=audio,
                                  sr=16000,
                                  attack=attack,
-                                 epsilon=epsilon,
-                                 model='Ens1D_ResSEN',
+                                 epsilon=None,
+                                 model=f'Ens1D_ResSEN_{q_res}_{q_sen}',
                                  model_version=model_version,
                                  type_of_spec=type_of_spec)
         del batch_x
@@ -234,11 +229,11 @@ if __name__ == '__main__':
     '''
     attack = 'Ens1D_ResSEN'   #'FGSM' or 'BIM'
     dataset = 'whole'  # '3s' or 'whole'
-    epsilon = 0.01
     model_version = 'v0' # or 'old'
     type_of_spec = 'pow'   # 'pow' or 'mag'
-    q_res = 1
-    q_sen = 90
+    q_res = 40
+    q_sen = 40
+    eps_res = eps_sen = 0.001
     '''
     #######################################
     '''
@@ -266,10 +261,8 @@ if __name__ == '__main__':
     Ens1D_ResSEN(config_sen,
                  model_res,
                  model_sen,
-                 epsilon,
                  model_version,
                  dataset,
                  df_eval,
                  device,
-                 q_res,
-                 q_sen)
+                 q_res, q_sen, eps_res, eps_sen)

@@ -64,10 +64,13 @@ def Ens2D_ResSEN(model_res, model_sen, df_eval, config_res, q_res, q_sen, epsilo
     print('The ensemble attack 2D on ResNet and SENet starts...\n')
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
 
-    for batch_x, batch_y, phase, audio_len, index in tqdm(data_loader, total=len(data_loader)):
+    for batch_x, batch_y, phase, audio_len, index, max_abs, mean in tqdm(data_loader, total=len(data_loader)):
         start_time = time.time()
 
         phase = phase.numpy()
+        max_abs = max_abs.numpy()
+        mean = mean.numpy()
+
         batch_x = batch_x.to(device)
         batch_z = batch_x.clone().to(device)
         batch_y = batch_y.to(device)
@@ -109,11 +112,6 @@ def Ens2D_ResSEN(model_res, model_sen, df_eval, config_res, q_res, q_sen, epsilo
                 thresh_sen = torch.quantile(abs_grad_sen, q_sen / 100)
                 thresh_res = torch.quantile(abs_grad_res, q_res / 100)
 
-                """
-                create the new grad
-                """
-                matrix = torch.full_like(grad_sen, float('inf'))
-
                 # Masks for values that exceed the threshold
                 mask_sen = abs_grad_sen > thresh_sen
                 mask_res = abs_grad_res > thresh_res
@@ -121,24 +119,17 @@ def Ens2D_ResSEN(model_res, model_sen, df_eval, config_res, q_res, q_sen, epsilo
                 # Overlap where both grad_res and grad_sen exceed their thresholds
                 overlap = mask_sen & mask_res
 
-                # For overlapping values, compute the mean of grad_res and grad_sen
-                #matrix[overlap] = (w_res *grad_res[overlap] + w_sen*grad_sen[overlap]) / 2
-                matrix[overlap] = (w_res * grad_res[overlap])
-
-                # For non-overlapping values, take grad_sen values where only grad_sen exceeds the threshold
-                matrix[mask_sen & ~overlap] = w_sen*grad_sen[mask_sen & ~overlap]
-
-                # For non-overlapping values, take grad_res values where only grad_res exceeds the threshold
-                matrix[mask_res & ~overlap] = w_res*grad_res[mask_res & ~overlap]
-
-                # replace inf with 0
-                matrix[matrix == float('inf')] = 0
-                grad = matrix
-
                 """
-                Perform the attack
+                create new grad
                 """
-                pert_batch = batch_x + alpha * grad.sign()
+                # Create new grad, initially with values from grad_res
+                new_grad = grad_res.clone()
+
+                # Replace values in the overlap with the mean of grad_res and grad_sen using the mask
+                new_grad[overlap] = (grad_res[overlap] + grad_sen[overlap]) / 2
+
+                # Perform the attack
+                pert_batch = batch_x + alpha * new_grad.sign()
 
                 out_pert_res = model_res(pert_batch)
                 predicted_labels_res = torch.argmax(out_pert_res, dim=1)
@@ -154,11 +145,13 @@ def Ens2D_ResSEN(model_res, model_sen, df_eval, config_res, q_res, q_sen, epsilo
 
                 pbar.set_description(f'BIM iter {i + 1}/{n_iters} | eff. SEN: {effectiveness_percentage_sen:.2f}% | eff. Res: {effectiveness_percentage_res:.2f}%')
 
-                batch_x = batch_z = pert_batch.detach().clone()
+                batch_x = pert_batch.detach().clone()
+                batch_z = pert_batch.detach().clone()
                 batch_x.requires_grad = True
                 batch_z.requires_grad = True
 
                 pbar.update(1)
+                del grad_res, grad_sen
 
         pbar.n = min(pbar.total, i + 1)  # Update to the final iteration count
         pbar.refresh()
@@ -197,7 +190,18 @@ def Ens2D_ResSEN(model_res, model_sen, df_eval, config_res, q_res, q_sen, epsilo
                                         center=True)
 
             if type_of_spec == 'pow':
-                recon_audio = librosa.util.normalize(recon_audio)
+                '''
+                normalization process
+                '''
+                clean_max_abs = max_abs[m]
+                clean_mean = mean[m]
+                # normalize to have the same max abs value
+                pert_max_abs = np.max(np.abs(recon_audio))
+                if pert_max_abs > 0:  # avoid division by 0
+                    recon_audio = recon_audio * (clean_max_abs / pert_max_abs)
+                # same mean
+                pert_mean = np.mean(recon_audio)
+                recon_audio = recon_audio + (clean_mean - pert_mean)
             else:
                 pass
 
@@ -238,12 +242,12 @@ if __name__ == '__main__':
     ########## INSERT PARAMETERS ##########
     '''
     attack = 'Ens2D_ResSEN'  # 'FGSM' or 'BIM'
-    epsilon = 4.0
+    epsilon = 3.0
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'
     type_of_spec = 'pow'  # 'pow' or 'mag'
     q_res = 10
-    q_sen = 80
+    q_sen = 10
     '''
     #######################################
     '''
