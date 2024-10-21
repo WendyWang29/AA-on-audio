@@ -67,7 +67,7 @@ def Ens1D_ResSEN(config_sen,
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
 
     for batch_x, batch_y, audio_len, index, max_abs, mean in tqdm(data_loader, total=len(data_loader)):
-
+        start_time = time.time()
         max_abs = max_abs.numpy()
         mean = mean.numpy()
 
@@ -124,52 +124,40 @@ def Ens1D_ResSEN(config_sen,
                 '''
                 Handle overlapping values: half from grad_res, half from grad_raw
                 '''
-                if overlap_mask.sum() > 0:
-                    # Get overlapping values for grad_res and grad_raw
-                    overlap_values_res = grad_res[overlap_mask]
-                    overlap_values_sen = grad_sen[overlap_mask]
 
-                    # Sort the absolute values and get the indices for sorting
-                    sorted_res_idx = torch.argsort(torch.abs(overlap_values_res), descending=True)
-                    sorted_sen_idx = torch.argsort(torch.abs(overlap_values_sen), descending=True)
+                # For the overlap region, randomly mix half of grad_res and grad_raw
+                overlap_indices = overlap_mask.nonzero(as_tuple=True)
 
-                    # Split indices in half: top half from grad_res, top half from grad_raw
-                    n_overlap = overlap_values_res.numel()
-                    half_size = n_overlap // 2
+                if overlap_indices[0].numel() > 0:
+                    # Randomly select half the positions for grad_res and the other half for grad_raw
+                    random_mask_res = torch.rand(overlap_indices[0].numel()).to(
+                        grad_res.device) < 0.5  # 50% mask for grad_res
+                    random_mask_sen = ~random_mask_res  # The remaining 50% mask for grad_sen
 
-                    # Take half of the top values from grad_res
-                    top_res_idx = sorted_res_idx[:half_size]
+                    # Apply grad_res to the positions selected by random_mask_res
+                    pert_batch[overlap_indices[0][random_mask_res], overlap_indices[1][random_mask_res]] += \
+                        alpha_res * grad_res[
+                            overlap_indices[0][random_mask_res], overlap_indices[1][random_mask_res]].sign()
 
-                    # Take half of the top values from grad_raw
-                    top_sen_idx = sorted_sen_idx[:half_size]
+                    # Apply grad_raw to the positions selected by random_mask_raw
+                    pert_batch[overlap_indices[0][random_mask_sen], overlap_indices[1][random_mask_sen]] += \
+                        alpha_sen * grad_sen[
+                            overlap_indices[0][random_mask_sen], overlap_indices[1][random_mask_sen]].sign()
 
-                    # Initialize new gradient for the overlapping mask
-                    new_overlap_grad = torch.zeros_like(overlap_values_res)
+                # effect on ResNet
+                predicted_labels_res = torch.argmax(model_res(pert_batch), dim=1)
+                wrong_pred_res = (predicted_labels_res != batch_y)
+                effect_res = wrong_pred_res.float().mean() * 100
 
-                    # Assign top values from grad_res
-                    new_overlap_grad[top_res_idx] = alpha_res * overlap_values_res[top_res_idx].sign()
+                # effect on SENet
+                predicted_labels_sen = torch.argmax(model_sen(pert_batch), dim=1)
+                wrong_pred_sen = (predicted_labels_sen != batch_y)
+                effect_sen = wrong_pred_sen.float().mean() * 100
 
-                    # Assign top values from grad_raw
-                    new_overlap_grad[top_sen_idx] = alpha_sen * overlap_values_sen[top_sen_idx].sign()
+                pbar.set_description(f'BIM iter {i + 1}/{n_iters} | eff. SEN: {effect_sen:.2f}% | eff. Res: {effect_res:.2f}%')
 
-                    # Update pert_batch with the new values for overlapping region
-                    pert_batch[overlap_mask] += new_overlap_grad
-
-                out_pert_sen = model_sen(pert_batch)
-                predicted_labels_sen = torch.argmax(out_pert_sen, dim=1)
-                wrong_predictions_sen = (predicted_labels_sen != batch_y)
-                effectiveness_sen = wrong_predictions_sen.float().mean()
-                effectiveness_percentage_sen = effectiveness_sen * 100
-
-                out_pert_res = model_res(pert_batch)
-                predicted_labels_res = torch.argmax(out_pert_res, dim=1)
-                wrong_predictions_res = (predicted_labels_res != batch_y)
-                effectiveness_res = wrong_predictions_res.float().mean()
-                effectiveness_percentage_res = effectiveness_res * 100
-
-                pbar.set_description(f'BIM iter {i + 1}/{n_iters} | eff. SEN: {effectiveness_percentage_sen:.2f}% | eff. Res: {effectiveness_percentage_res:.2f}%')
-
-                batch_x = batch_z = pert_batch.detach().clone()
+                batch_x = pert_batch.detach().clone()
+                batch_z = pert_batch.detach().clone()
                 batch_x.requires_grad = True
                 batch_z.requires_grad = True
 
@@ -204,12 +192,16 @@ def Ens1D_ResSEN(config_sen,
                                  folder=audio_folder,
                                  audio=audio,
                                  sr=16000,
-                                 attack=attack,
+                                 attack='Ens1D',
                                  epsilon=None,
-                                 model=f'Ens1D_ResSEN_{q_res}_{q_sen}',
+                                 model=f'ResSEN_{q_res}_{q_sen}',
                                  model_version=model_version,
                                  type_of_spec=type_of_spec)
-        del batch_x
+        del batch_x, batch_z
+        time_taken = time.time() - start_time
+        tqdm.write(
+            f'Time taken: {time_taken:.3f} | SEN effect. {effect_sen:.2f}% | Res eff. {effect_res:.2f}% ')
+        gc.collect()
 
 
 if __name__ == '__main__':
@@ -231,9 +223,10 @@ if __name__ == '__main__':
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0' # or 'old'
     type_of_spec = 'pow'   # 'pow' or 'mag'
-    q_res = 40
-    q_sen = 40
-    eps_res = eps_sen = 0.001
+    q_res = 30
+    q_sen = 50
+    eps_res = 0.009
+    eps_sen = 0.002
     '''
     #######################################
     '''

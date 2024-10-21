@@ -103,7 +103,8 @@ def train_epoch_resnet(data_loader, model, lr, device):
     model.train()
 
     optim = torch.optim.Adam(model.parameters(), lr=lr)
-    weight = torch.FloatTensor([0.1, 0.9]).to(device)
+    #weight = torch.FloatTensor([0.1, 0.9]).to(device)
+    weight = torch.FloatTensor([0.9, 0.1]).to(device)
     criterion = nn.NLLLoss(weight)
     # criterion = nn.NLLLoss()
 

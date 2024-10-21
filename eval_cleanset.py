@@ -227,7 +227,7 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    model = 'ResNet2D'
+    model = 'SENet2D'
     model_version = 'v0'
     type_of_spec = 'pow'   # 'mag', 'pow'
     dataset = 'whole'   # '3s', 'whole'
