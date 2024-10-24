@@ -14,14 +14,14 @@ import sys
 from attacks.sp_utils import spectrogram_inversion_batch
 from attacks_utils import save_perturbed_audio, save_perturbed_spec
 
-def PGD_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device):
+def BIMR_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device):
 
     epsilon_str = str(epsilon).replace('.', 'dot')
     type_of_spec = 'pow'  # this was inside the model....
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
-    audio_folder = f'PGD_ResNet1D_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
-    audio_folder = os.path.join(current_dir, f'PGD_ResNet1D_{model_version}_{type_of_spec}', audio_folder)
+    audio_folder = f'BIMR_ResNet1D_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
+    audio_folder = os.path.join(current_dir, f'BIMR_ResNet1D_{model_version}_{type_of_spec}', audio_folder)
 
     os.makedirs(audio_folder, exist_ok=True)
     print(f'Saving the perturbed audio in {audio_folder}...\n')
@@ -40,7 +40,7 @@ def PGD_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
     del feat_set
     L = nn.NLLLoss()
 
-    n_iters = 10  # max number of BIM iterations
+    n_iters = 50  # max number of BIM iterations
     alpha = epsilon/n_iters  # perturbation to add at each iteration
     print(f'Using n_iters={n_iters} and alpha={alpha}\n')
     # win_length = 2048
@@ -50,21 +50,28 @@ def PGD_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
     # window = 'hann'
 
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
-    print('The PGD attack starts...\n')
+    print('The BIMR attack starts...\n')
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
 
-    for batch_x, batch_y, audio_len, index in tqdm(data_loader, total=len(data_loader)):
+    for batch_x, batch_y, audio_len, index, max_abs, mean in tqdm(data_loader, total=len(data_loader)):
         start_time = time.time()
+
+        max_abs = max_abs.numpy()
+        mean = mean.numpy()
 
         batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
+
+        # Get the original min and max of each sample (before perturbation)
+        orig_min = batch_x.min(dim=-1, keepdim=True)[0]
+        orig_max = batch_x.max(dim=-1, keepdim=True)[0]
+
+        # Scale batch_x to lie within [orig_min + epsilon, orig_max - epsilon]
+        batch_x = (batch_x - orig_min) / (orig_max - orig_min)  # Normalize to [0, 1]
+        batch_x = batch_x * (orig_max - orig_min - 2 * epsilon) + (orig_min + epsilon)  # Scale to [orig_min + epsilon, orig_max - epsilon]
         batch_x.requires_grad = True
 
-        # Step 1: Random Initialization within epsilon-ball
-        pert_batch = batch_x + torch.empty_like(batch_x).uniform_(-epsilon, epsilon).to(device)
-        pert_batch = torch.clamp(pert_batch, 0, 1)  # Ensure inputs are in valid range (e.g., between 0 and 1 for audio)
-
-        with tqdm(total=n_iters, desc='PGD iteration', leave=False) as pbar:
+        with tqdm(total=n_iters, desc='BIM iteration', leave=False) as pbar:
             effectiveness_percentage = 0
             for i in range(n_iters):
 
@@ -74,12 +81,8 @@ def PGD_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
                 loss.backward()
                 grad = batch_x.grad.data
 
-                pert_batch = pert_batch + alpha * grad.sign()
-                # Step 3: Projection back to the epsilon-ball
-                perturbation = torch.clamp(pert_batch - batch_x, -epsilon, epsilon)  # Project the perturbation
-                pert_batch = torch.clamp(batch_x + perturbation, 0, 1)  # Ensure perturbed input stays in valid range
+                pert_batch = batch_x + alpha * grad.sign()
 
-                # early stopping
                 out_pert = model(pert_batch)
                 predicted_labels = torch.argmax(out_pert, dim=1)
                 wrong_predictions = (predicted_labels != batch_y)
@@ -93,7 +96,6 @@ def PGD_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
 
                 pbar.update(1)
 
-        pbar.n = min(pbar.total, i + 1)  # Update to the final iteration count
         pbar.refresh()
         batch_x = batch_x.squeeze(0).detach().cpu().numpy()
 
@@ -102,7 +104,20 @@ def PGD_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
         """
         for m in range(batch_x.shape[0]):
 
+            # get the single perturbed audio
             audio = batch_x[m]
+            clean_max_abs = max_abs[m]
+            clean_mean = mean[m]
+
+            # normalize to have the same max abs value
+            pert_max_abs = np.max(np.abs(audio))
+            if pert_max_abs > 0:  # avoid division by 0
+                audio = audio * (clean_max_abs / pert_max_abs)
+
+            # same mean
+            pert_mean = np.mean(audio)
+            audio = audio + (clean_mean - pert_mean)
+
 
             save_perturbed_audio(file=file_eval[index[m]],
                                  folder=audio_folder,
@@ -247,7 +262,7 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'BIM'   #'FGSM' or 'BIM'
+    attack = 'BIMR'   #'FGSM' or 'BIM'
     dataset = 'whole'  # '3s' or 'whole'
     epsilon = 0.025
     model_version = 'v0' # or 'old'
@@ -282,11 +297,18 @@ if __name__ == '__main__':
     print(f'ResNet model loaded with weights of version {model_version}\n'
           f'{attack} will be performed with epsilon = {epsilon}, on dataset: {dataset}, using {type_of_spec} spectrograms')
 
-
-    BIM_ResNet1D(config,
+    BIMR_ResNet1D(config,
                  epsilon,
                  model,
                  model_version,
                  dataset,
                  df_eval,
                  device)
+
+    # BIM_ResNet1D(config,
+    #              epsilon,
+    #              model,
+    #              model_version,
+    #              dataset,
+    #              df_eval,
+    #              device)

@@ -176,15 +176,15 @@ if __name__ == '__main__':
     ########## INSERT PARAMETERS ##########
     '''
     attack = 'Ens1D'  # 'FGSM' or 'Ensemble'
-    attack_model = 'ResSEN'  #'ResNet' or 'SENet' or 'ResNet1D'
+    attack_model = 'RawSEN'  #'ResNet' or 'SENet' or 'ResNet1D'
     epsilon = None
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
     feature = 'audio'  # RawNet can only work with audio files
-    q1 = 30
-    q2 = 50
-    eps1 = 0.009
+    q1 = 20
+    q2 = 60
+    eps1 = 0.005
     eps2 = 0.002
 
     '''
