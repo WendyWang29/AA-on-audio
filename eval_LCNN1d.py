@@ -23,7 +23,7 @@ import os
 
 
 
-def LCNN1D_eval(senet1d_model,
+def LCNN1D_eval(model,
                 save_path,
                 device,
                 config,
@@ -33,70 +33,34 @@ def LCNN1D_eval(senet1d_model,
                 attack,
                 dataset,
                 feature,
-                q_res,
-                q_sen):
+                q1, q2, eps1, eps2):
 
     epsilon_dot_notation = str(epsilon).replace('.', 'dot')
+    eps1_str = str(eps1).replace('.', 'dot')
+    eps2_str = str(eps2).replace('.', 'dot')
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
 
     if feature == 'audio':
-        if attack == 'BIM':
+        if attack != 'Ens1D' and attack != 'Ens2D':
             feat_directory = os.path.join(script_dir, 'attacks',
                                           f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
                                           f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
             csv_location = os.path.join(script_dir, 'eval',
-                                                f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
+                                        f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-
-    #     if attack != 'Ensemble' and attack != 'BIM' and attack != 'Ensemble1D' and attack != 'Ensemble1D_RaS' and attack != 'Ensemble1D_RS':
-    #         feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
-    #                                       f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
-    #         csv_location = os.path.join(script_dir, 'eval',
-    #                                     f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
-    #         # create list of flac files
-    #         feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-    #     elif attack == 'BIM':
-    #         feat_directory = os.path.join(script_dir, 'attacks',
-    #                                       f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
-    #                                       f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
-    #         csv_location = os.path.join(script_dir, 'eval',
-    #                                     f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
-    #         # create list of flac files
-    #         feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-    #     elif attack == 'Ensemble':
-    #         feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble',
-    #                                       f'QUANT_ENS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-    #         csv_location = os.path.join(script_dir, 'eval',
-    #                                     f'list_flac_Ensemble_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-    #         # create list of flac files
-    #         feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-    #     elif attack == 'Ensemble1D':
-    #         feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble1D',
-    #                                       f'QUANT_ENS1D_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-    #         csv_location = os.path.join(script_dir, 'eval',
-    #                                     f'list_flac_Ensemble1D_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-    #         # create list of flac files
-    #         feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-    #     elif attack == 'Ensemble1D_RS':
-    #         feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble1D_RS',
-    #                                       f'QUANT_ENS1D_RS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-    #         csv_location = os.path.join(script_dir, 'eval',
-    #                                     f'list_flac_Ensemble1D_RS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-    #         # create list of flac files
-    #         feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-    #     elif attack == 'Ensemble1D_RaS':
-    #         feat_directory = os.path.join(script_dir, 'attacks', 'Ensemble1D_RaS',
-    #                                       f'QUANT_ENS1D_RaS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-    #         csv_location = os.path.join(script_dir, 'eval',
-    #                                     f'list_flac_Ensemble1D_RaS_{model_version}_{q_res}_{q_sen}_{dataset}_{epsilon_dot_notation}')
-    #         # create list of flac files
-    #         feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-    # else:
-    #     sys.exit('This model can only handle as input audio files...')
-
-
+        elif attack == 'Ens1D':
+            feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
+                                          f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{q1}_{q2}_{eps1_str}_{eps2_str}')
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{q1}_{q2}_{eps1_str}_{eps2_str}')
+            # create list of flac files
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+        elif attack == 'Ens2D':
+            sys.exit('2D ensemble todo')
+        else:
+            sys.exit(f'Unknown type of attack {attack} on {attack_model}')
 
     if os.path.exists(csv_location):
         os.remove(csv_location)
@@ -124,7 +88,7 @@ def LCNN1D_eval(senet1d_model,
     feat_set = LoadEvalData_RawNet(list_IDs=file_eval, config=config)
     feat_loader = DataLoader(feat_set, batch_size=config['eval_batch_size'], shuffle=False, num_workers=15)
 
-    senet1d_model.eval()
+    model.eval()
 
     with torch.no_grad():
 
@@ -132,7 +96,7 @@ def LCNN1D_eval(senet1d_model,
             # fname_list = []
             # score_list = []
             feat_batch = feat_batch.to(torch.float32).to(device)
-            score = senet1d_model(feat_batch)
+            score = model(feat_batch)
             probabilities = torch.exp(score)
             probabilities = probabilities.detach().cpu().numpy()
 
@@ -148,7 +112,7 @@ def LCNN1D_eval(senet1d_model,
 
 
 
-def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack, dataset, feature, q_res, q_sen):
+def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack, dataset, feature, q1, q2, eps1, eps2):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
@@ -168,27 +132,27 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
     else:
         sys.exit('Wrong type of spectrogram mode: should be pow or mag')
 
-
-    if attack != 'Ensemble' and attack != 'Ensemble1D' and attack != 'Ensemble1D_RS' and attack != 'Ensemble1D_RaS':
+    if attack != 'Ens2D' and attack != 'Ens1D':
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
                                  f'probs_LCNN1D_{model_version}_{attack}_{attack_model}_{dataset}_{epsilon_str}_{type_of_spec}_{feature}.csv')
         LCNN1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
-                    feature, q_res, q_sen)
+                    feature, q1, q2, eps1, eps2)
 
-
-    elif attack == 'Ensemble' or attack == 'Ensemble1D' or attack == 'Ensemble1D_RS' or attack == 'Ensemble1D_RaS':
-        epsilon_str = str(epsilon).replace('.', 'dot')
+    elif attack == 'Ens1D':
+        eps1_str = str(eps1).replace('.', 'dot')
+        eps2_str = str(eps2).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
-                                 f'probs_LCNN1D_{model_version}_{attack}_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
-        LCNN1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature, q_res, q_sen)
+                                 f'probs_LCNN1D_{model_version}_{attack}_{attack_model}_{q1}_{q2}_{eps1_str}_{eps2_str}_{type_of_spec}_{feature}.csv')
+        LCNN1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature,
+                     q1, q2, eps1, eps2)
 
-
+    elif attack == 'Ens2D':
+        sys.exit('TODO 2D ens')
     else:
         sys.exit(f'Invalid attack combination for {attack}, {attack_model}')
-
 
 
 
@@ -204,15 +168,16 @@ if __name__ == '__main__':
     ########## INSERT PARAMETERS ##########
     '''
     attack = 'BIM'  # 'FGSM' or 'Ensemble'
-    attack_model = 'ResNet1D'  #'ResNet' or 'SENet' or 'ResNet1D'
-    epsilon = 0.025
+    attack_model = 'ResNet2D'  #'ResNet' or 'SENet' or 'ResNet1D'
+    epsilon = 3.0
     dataset = 'whole'  # '3s' or 'whole'-
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
     feature = 'audio'  # SeNet1d can only work with 1d inputs
-    q_res = 10  # first model
-    q_sen = 10  # second model
-
+    q1 = 20  # first model
+    q2 = 50  # second model
+    eps1 = 0.008
+    eps2 = 0.01
 
 
 
@@ -224,5 +189,4 @@ if __name__ == '__main__':
               attack=attack,
               dataset=dataset,
               feature=feature,
-              q_res=q_res,
-              q_sen=q_sen)
+              q1=q1, q2=q2, eps1=eps1, eps2=eps2)

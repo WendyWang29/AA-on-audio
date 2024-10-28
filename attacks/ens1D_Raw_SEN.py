@@ -72,12 +72,10 @@ def Ens1D_RawSEN(config_sen,
         max_abs = max_abs.numpy()
         mean = mean.numpy()
 
-        batch_z = batch_x.clone().to(device)
         batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
 
         batch_x.requires_grad = True
-        batch_z.requires_grad = True
 
         with tqdm(total=n_iters, desc='BIM iteration', leave=False) as pbar:
             for i in range(n_iters):
@@ -85,14 +83,16 @@ def Ens1D_RawSEN(config_sen,
                 out_sen = model_sen(batch_x)
                 loss_sen = L(out_sen, batch_y)
                 model_sen.zero_grad()
-                loss_sen.backward()
-                grad_sen = batch_x.grad.data
+                loss_sen.backward(retain_graph=True)
+                grad_sen = batch_x.grad.data.clone()
+                batch_x.grad.zero_()
 
-                out_raw = model_raw(batch_z)
+                out_raw = model_raw(batch_x)
                 loss_raw = L(out_raw, batch_y)
                 model_raw.zero_grad()
-                loss_raw.backward()
-                grad_raw = batch_z.grad.data
+                loss_raw.backward(retain_graph=True)
+                grad_raw = batch_x.grad.data.clone()
+                batch_x.grad.zero_()
 
                 # grad_raw_mean = torch.mean(grad_raw)
                 # grad_raw_std = torch.std(grad_raw)
@@ -113,13 +113,9 @@ def Ens1D_RawSEN(config_sen,
                 '''
                 overlap_mask = mask_raw & mask_sen  # intersection
 
-                # Take the sign of grad_sen and grad_raw for non-overlapping and apply corresponding alpha
-                pert_batch = batch_x.clone()  # Clone batch_x to pert_batch
-
-                # Apply alpha_raw to grad_raw for non-overlapping areas
+                # Create pert_batch in-place
+                pert_batch = batch_x.clone()
                 pert_batch[mask_raw & ~overlap_mask] += alpha_raw * grad_raw[mask_raw & ~overlap_mask].sign()
-
-                # Apply alpha_sen to grad_raw for non-overlapping areas
                 pert_batch[mask_sen & ~overlap_mask] += alpha_sen * grad_sen[mask_sen & ~overlap_mask].sign()
 
                 '''
@@ -158,12 +154,9 @@ def Ens1D_RawSEN(config_sen,
                 pbar.set_description(f'BIM iter {i + 1}/{n_iters} | eff. SEN: {effect_sen:.2f}% | eff. Raw: {effect_raw:.2f}%')
 
                 batch_x = pert_batch.detach().clone()
-                batch_z = pert_batch.detach().clone()
                 batch_x.requires_grad = True
-                batch_z.requires_grad = True
-
-                del grad_raw, grad_sen
-
+                del grad_raw, grad_sen, pert_batch, predicted_labels_raw, predicted_labels_sen, wrong_pred_sen, wrong_pred_raw
+                torch.cuda.empty_cache()
                 pbar.update(1)
 
         pbar.n = min(pbar.total, i + 1)  # Update to the final iteration count
@@ -189,16 +182,20 @@ def Ens1D_RawSEN(config_sen,
             pert_mean = np.mean(audio)
             audio = audio + (clean_mean - pert_mean)
 
+            # cut the audio to original audio length
+            sliced_audio = audio[:audio_len[m]]
+
             save_perturbed_audio(file=file_eval[index[m]],
                                  folder=audio_folder,
-                                 audio=audio,
+                                 audio=sliced_audio,
                                  sr=16000,
                                  attack='Ens1D',
                                  epsilon=None,
                                  model=f'RawSEN_{q_raw}_{q_sen}',
                                  model_version=model_version,
                                  type_of_spec=type_of_spec)
-        del batch_x, batch_z
+        del batch_x, pert_batch
+
         time_taken = time.time() - start_time
         tqdm.write(
             f'Time taken: {time_taken:.3f} | SEN effect. {effect_sen:.2f}% | Raw eff. {effect_raw:.2f}% ')
@@ -224,10 +221,10 @@ if __name__ == '__main__':
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0' # or 'old'
     type_of_spec = 'pow'   # 'pow' or 'mag'
-    q_raw = 20
-    q_sen = 60
-    eps_raw = 0.005
-    eps_sen = 0.002
+    q_raw = 50
+    q_sen = 40
+    eps_raw = 0.008
+    eps_sen = 0.004
     '''
     #######################################
     '''

@@ -127,7 +127,7 @@ def ResNet_eval(resnet_model,
     else:
         sys.exit('Wrong type of feature, should be spec or audio')
 
-    feat_loader = DataLoader(feat_set, batch_size=config_res['eval_batch_size'], shuffle=False, num_workers=15)
+    feat_loader = DataLoader(feat_set, batch_size=config_res['eval_batch_size'], shuffle=False, num_workers=10)
 
     resnet_model.eval()
 
@@ -198,7 +198,7 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
 
 if __name__ == '__main__':
     seed_everything(1234)
-    set_gpu(-1)
+    set_gpu(-2)
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
     config_path = os.path.join(script_dir, 'config/residualnet_train_config.yaml')
@@ -214,7 +214,7 @@ if __name__ == '__main__':
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
-    feature = 'spec'  #'spec' or 'audio'
+    feature = 'audio'  #'spec' or 'audio'
     q_res = 10   # model1
     q_sen = 10   # model2
 

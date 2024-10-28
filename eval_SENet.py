@@ -127,7 +127,7 @@ def SENet_eval(senet_model,
     else:
         sys.exit('Wrong type of feature, should be spec or audio')
 
-    feat_loader = DataLoader(feat_set, batch_size=config_res['eval_batch_size'], shuffle=False, num_workers=15)
+    feat_loader = DataLoader(feat_set, batch_size=config_res['eval_batch_size'], shuffle=False, num_workers=10)  #15
 
     senet_model.eval()
 
@@ -208,7 +208,7 @@ if __name__ == '__main__':
     ########## INSERT PARAMETERS ##########
     '''
     attack = 'BIM'  # 'FGSM' or 'Ensemble'
-    attack_model = 'LCNN2D'  #'ResNet' or 'SENet'
+    attack_model = 'ResNet2D'  #'ResNet' or 'SENet'
     epsilon = 3.0
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model

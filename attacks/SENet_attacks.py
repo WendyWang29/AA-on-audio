@@ -185,10 +185,13 @@ def BIM_SENet(epsilon,
     print('The BIM 2D attack on SENet starts...\n')
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
 
-    for batch_x, batch_y, phase, audio_len, index in tqdm(data_loader, total=len(data_loader)):
+    for batch_x, batch_y, phase, audio_len, index, max_abs, mean in tqdm(data_loader, total=len(data_loader)):
         start_time = time.time()
 
         phase = phase.numpy()
+        max_abs = max_abs.numpy()
+        mean = mean.numpy()
+
         batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
         batch_x.requires_grad = True
@@ -258,7 +261,18 @@ def BIM_SENet(epsilon,
                                         center=True)
 
             if type_of_spec == 'pow':
-                recon_audio = librosa.util.normalize(recon_audio)
+                '''
+                                normalization process
+                                '''
+                clean_max_abs = max_abs[m]
+                clean_mean = mean[m]
+                # normalize to have the same max abs value
+                pert_max_abs = np.max(np.abs(recon_audio))
+                if pert_max_abs > 0:  # avoid division by 0
+                    recon_audio = recon_audio * (clean_max_abs / pert_max_abs)
+                # same mean
+                pert_mean = np.mean(recon_audio)
+                recon_audio = recon_audio + (clean_mean - pert_mean)
             else:
                 pass
 
@@ -286,7 +300,7 @@ def BIM_SENet(epsilon,
 if __name__ == '__main__':
 
     seed_everything(1234)
-    set_gpu(5)
+    set_gpu(-1)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
@@ -297,7 +311,7 @@ if __name__ == '__main__':
     ########## INSERT PARAMETERS ##########
     '''
     attack = 'BIM'  # 'FGSM_3s' or 'FGSM'
-    epsilon = 3.0
+    epsilon = 3.5
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'
     type_of_spec = 'pow'  # 'pow' or 'mag'

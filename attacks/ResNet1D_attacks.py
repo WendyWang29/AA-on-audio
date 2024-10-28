@@ -232,10 +232,12 @@ def BIM_ResNet1D(config, epsilon, model, model_version, dataset, df_eval, device
             pert_mean = np.mean(audio)
             audio = audio + (clean_mean - pert_mean)
 
+            # cut the audio to original audio length
+            sliced_audio = audio[:audio_len[m]]
 
             save_perturbed_audio(file=file_eval[index[m]],
                                  folder=audio_folder,
-                                 audio=audio,
+                                 audio=sliced_audio,
                                  sr=16000,
                                  attack=attack,
                                  epsilon=epsilon,
@@ -262,7 +264,7 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'BIMR'   #'FGSM' or 'BIM'
+    attack = 'BIM'   #'FGSM' or 'BIM'
     dataset = 'whole'  # '3s' or 'whole'
     epsilon = 0.025
     model_version = 'v0' # or 'old'
@@ -297,18 +299,12 @@ if __name__ == '__main__':
     print(f'ResNet model loaded with weights of version {model_version}\n'
           f'{attack} will be performed with epsilon = {epsilon}, on dataset: {dataset}, using {type_of_spec} spectrograms')
 
-    BIMR_ResNet1D(config,
+
+
+    BIM_ResNet1D(config,
                  epsilon,
                  model,
                  model_version,
                  dataset,
                  df_eval,
                  device)
-
-    # BIM_ResNet1D(config,
-    #              epsilon,
-    #              model,
-    #              model_version,
-    #              dataset,
-    #              df_eval,
-    #              device)

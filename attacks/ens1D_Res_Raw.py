@@ -66,12 +66,10 @@ def Ens1D_ResRaw(config_res,
         max_abs = max_abs.numpy()
         mean = mean.numpy()
 
-        batch_z = batch_x.clone().to(device)
         batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
 
         batch_x.requires_grad = True
-        batch_z.requires_grad = True
 
         with tqdm(total=n_iters, desc='BIM iteration', leave=False) as pbar:
             for i in range(n_iters):
@@ -82,14 +80,16 @@ def Ens1D_ResRaw(config_res,
                 out_res = model_res(batch_x)
                 loss_res = L(out_res, batch_y)
                 model_res.zero_grad()
-                loss_res.backward()
-                grad_res = batch_x.grad.data
+                loss_res.backward(retain_graph=True)
+                grad_res = batch_x.grad.data.clone()
+                batch_x.grad.zero_()
 
-                out_raw = model_raw(batch_z)
+                out_raw = model_raw(batch_x)
                 loss_raw = L(out_raw, batch_y)
                 model_raw.zero_grad()
-                loss_raw.backward()
-                grad_raw = batch_z.grad.data
+                loss_raw.backward(retain_graph=True)
+                grad_raw = batch_x.grad.data.clone()
+                batch_x.grad.zero_()
 
                 # grad_res_mean = torch.mean(grad_res)
                 # grad_res_std = torch.std(grad_res)
@@ -155,9 +155,7 @@ def Ens1D_ResRaw(config_res,
                     f'BIM iter {i + 1}/{n_iters} | eff. Res: {effect_res:.2f}% | eff. Raw: {effect_raw:.2f}% ')
 
                 batch_x = pert_batch.detach().clone()
-                batch_z = pert_batch.detach().clone()
                 batch_x.requires_grad = True
-                batch_z.requires_grad = True
 
                 pbar.update(1)
 
@@ -184,9 +182,12 @@ def Ens1D_ResRaw(config_res,
             pert_mean = np.mean(audio)
             audio = audio + (clean_mean - pert_mean)
 
+            # cut the audio to original audio length
+            sliced_audio = audio[:audio_len[m]]
+
             save_perturbed_audio(file=file_eval[index[m]],
                                  folder=audio_folder,
-                                 audio=audio,
+                                 audio=sliced_audio,
                                  sr=16000,
                                  attack='Ens1D',
                                  epsilon=None,
@@ -221,10 +222,10 @@ if __name__ == '__main__':
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'
     type_of_spec = 'pow'  # 'pow' or 'mag'
-    q_res = 30
+    q_res = 20
     q_raw = 50
     eps_res = 0.008
-    eps_raw = 0.02
+    eps_raw = 0.01
     '''
     #######################################
     '''

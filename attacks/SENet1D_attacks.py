@@ -113,9 +113,12 @@ def BIM_SENet1D(config, epsilon, model, model_version, dataset, df_eval, device)
             pert_mean = np.mean(audio)
             audio = audio + (clean_mean - pert_mean)
 
+            # cut the audio to original audio length
+            sliced_audio = audio[:audio_len[m]]
+
             save_perturbed_audio(file=file_eval[index[m]],
                                  folder=audio_folder,
-                                 audio=audio,
+                                 audio=sliced_audio,
                                  sr=16000,
                                  attack=attack,
                                  epsilon=epsilon,

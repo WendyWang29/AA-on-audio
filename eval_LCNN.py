@@ -2,7 +2,7 @@ import logging
 
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('tensorflow').setLevel(logging.WARNING)
-
+logging.getLogger('numba').setLevel(logging.WARNING)
 logger = logging.getLogger("add_challenge")
 logger.setLevel(logging.INFO)
 
@@ -164,39 +164,21 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
     else:
         sys.exit('Wrong type of spectrogram mode: should be pow or mag')
 
-    if attack != 'Ensemble' and attack != 'Ensemble1D' and attack != 'Ensemble1D_RS':
+    if attack != 'Ensemble' and attack != 'Ensemble1D' and attack != 'Ensemble1D_RS' and attack != 'Ensemble1D_RaS':
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
-                                 f'probs_LCNN_{model_version}_{attack}_{attack_model}_{dataset}_{epsilon_str}_{type_of_spec}_{feature}.csv')
+                                 f'probs_LCNN2D_{model_version}_{attack}_{attack_model}_{dataset}_{epsilon_str}_{type_of_spec}_{feature}.csv')
         LCNN_eval(lcnn_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
                   feature, q_res, q_sen)
 
-    elif attack == 'Ensemble':
+    elif attack == 'Ensemble' or attack == 'Ensemble1D' or attack == 'Ensemble1D_RS' or attack == 'Ensemble1D_RaS':
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
-                                 f'probs_LCNN_{model_version}_Ensemble_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
+                                 f'probs_LCNN2D_{model_version}_Ensemble_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
         LCNN_eval(lcnn_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature,
                   q_res, q_sen)
-
-    elif attack == 'Ensemble1D':
-        epsilon_str = str(epsilon).replace('.', 'dot')
-        save_path = os.path.join(script_dir,
-                                 'eval',
-                                 f'probs_LCNN_{model_version}_Ensemble1D_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
-        LCNN_eval(lcnn_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
-                  feature, q_res, q_sen)
-
-    elif attack == 'Ensemble1D_RS':
-        epsilon_str = str(epsilon).replace('.', 'dot')
-        save_path = os.path.join(script_dir,
-                                 'eval',
-                                 f'probs_LCNN_{model_version}_Ensemble1D_RS_{dataset}_{q_res}_{q_sen}_{epsilon_str}_{type_of_spec}_{feature}.csv')
-        LCNN_eval(lcnn_model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
-                  feature, q_res, q_sen)
-
-
     else:
         sys.exit(f'Invalid attack combination for {attack}, {attack_model}')
 
@@ -213,8 +195,8 @@ if __name__ == '__main__':
     ########## INSERT PARAMETERS ##########
     '''
     attack = 'BIM'  # 'FGSM' or 'Ensemble'
-    attack_model = 'ResNet1D'  # 'ResNet' or 'SENet'
-    epsilon = 0.02
+    attack_model = 'ResNet2D'  # 'ResNet' or 'SENet'
+    epsilon = 3.0
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'

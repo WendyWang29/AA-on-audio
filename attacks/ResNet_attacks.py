@@ -152,7 +152,6 @@ def BIM_ResNet(epsilon,
             # cut the audio to original audio length
             sliced_audio = recon_audio[:audio_len[m]]
 
-
             save_perturbed_audio(file=file_eval[index[m]],
                                  folder=audio_folder,
                                  audio=sliced_audio,
@@ -212,10 +211,12 @@ def FGSM_ResNet(epsilon, config, model, model_version, dataset, type_of_spec, df
     window = 'hann'
 
     # ########## ATTACK ##########
-    for batch_x, batch_y, phase, audio_len, index in tqdm(data_loader, total=len(data_loader)):
+    for batch_x, batch_y, phase, audio_len, index,max_abs, mean in tqdm(data_loader, total=len(data_loader)):
 
         start_time = time.time()
         phase = phase.numpy()
+        max_abs = max_abs.numpy()
+        mean = mean.numpy()
 
         batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
@@ -293,7 +294,7 @@ def FGSM_ResNet(epsilon, config, model, model_version, dataset, type_of_spec, df
 
 if __name__ == '__main__':
     seed_everything(1234)
-    set_gpu(2)
+    set_gpu(-2)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
