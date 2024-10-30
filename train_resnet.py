@@ -23,13 +23,13 @@ def main(config, type_of_spec):
     assert config['features'] in ['spec', 'mfcc'], 'Not supported feature'
 
     if type_of_spec == 'pow':
-        model_tag = 'model_{}_{}_{}_{}_v1'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+        model_tag = 'model_{}_{}_{}_{}_v0'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
         model_save_path = os.path.join(script_dir, config['model_folder_pow'], model_tag)
-    elif type_of_spec == 'mag':
-        model_tag = 'model_{}_{}_{}_{}_v1_mag'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
-        model_save_path = os.path.join(script_dir, config['model_folder_mag'], model_tag)
+    elif type_of_spec == 'logmag':
+        model_tag = 'model_{}_{}_{}_{}_v0_logmag'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+        model_save_path = os.path.join(script_dir, config['model_folder_logmag'], model_tag)
     else:
-        print('You need to choose what kind of spectrogram you want to work with between power and mag')
+        print('You need to choose what kind of spectrogram you want to work with between power and logmag')
         sys.exit()
 
     if not os.path.exists(model_save_path):
@@ -98,6 +98,6 @@ if __name__ == '__main__':
     config_path = os.path.join(script_dir, 'config/residualnet_train_config.yaml')
     config_res = read_yaml(config_path)
 
-    type_of_spec = 'pow' # 'mag' or 'pow'
+    type_of_spec = 'logmag' # 'mag' or 'pow'
     print(f'\n Training on {type_of_spec} spectrograms!\n')
     main(config_res, type_of_spec)

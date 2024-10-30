@@ -305,10 +305,10 @@ if __name__ == '__main__':
     ########## INSERT PARAMETERS ##########
     '''
     attack = 'BIM'  # 'FGSM' or 'BIM'
-    epsilon = 3.0
+    epsilon = 1.0
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'
-    type_of_spec = 'pow'  # 'pow' or 'mag'
+    type_of_spec = 'logmag'  # 'pow' or 'mag'
     '''
     #######################################
     '''

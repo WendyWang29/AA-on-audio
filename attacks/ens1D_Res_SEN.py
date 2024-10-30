@@ -225,10 +225,10 @@ if __name__ == '__main__':
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0' # or 'old'
     type_of_spec = 'pow'   # 'pow' or 'mag'
-    q_res = 30
-    q_sen = 50
+    q_res = 50
+    q_sen = 40
     eps_res = 0.009
-    eps_sen = 0.002
+    eps_sen = 0.003
     '''
     #######################################
     '''

@@ -18,11 +18,11 @@ def window_stack(a, stepsize=int(0.5*16000), width=int(1*16000)):
 
 
 def compute_spectrum(x, type_of_spec):
-    if type_of_spec == 'mag':
+    if type_of_spec == 'logmag':
         s = librosa.stft(x, n_fft=2048, win_length=2048, hop_length=512, window='hann', center=True)
         phase = np.angle(s)
         a = np.abs(s)
-        spec = a
+        spec = librosa.amplitude_to_db(a, ref=np.max)
     elif type_of_spec == 'pow':
         s = librosa.stft(x, n_fft=2048, win_length=2048, hop_length=512, window='hann', center=True)
         a = np.abs(s) ** 2

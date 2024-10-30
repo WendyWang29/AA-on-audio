@@ -31,10 +31,10 @@ def init_eval(model, model_version, type_of_spec, dataset, feature):
         resnet_model = SpectrogramModel().to(device)
         config_path = os.path.join(script_dir, 'config/residualnet_train_config.yaml')
         config = read_yaml(config_path)
-        if type_of_spec == 'mag':
+        if type_of_spec == 'logmag':
             if model_version == 'v0':
                 resnet_model.load_state_dict(
-                    torch.load(os.path.join(script_dir, config['model_path_spec_mag']), map_location=device),
+                    torch.load(os.path.join(script_dir, config['model_path_spec_logmag']), map_location=device),
                     strict=False)
         elif type_of_spec == 'pow':
             if model_version == 'v0':
@@ -54,7 +54,7 @@ def init_eval(model, model_version, type_of_spec, dataset, feature):
         if type_of_spec == 'mag':
             if model_version == 'v0':
                 senet_model.load_state_dict(
-                    torch.load(os.path.join(script_dir, config['model_path_spec_mag_v0']), map_location=device),
+                    torch.load(os.path.join(script_dir, config['model_path_spec_logmag']), map_location=device),
                     strict=False)
         elif type_of_spec == 'pow':
             if model_version == 'v0':
@@ -74,7 +74,7 @@ def init_eval(model, model_version, type_of_spec, dataset, feature):
         if type_of_spec == 'mag':
             if model_version == 'v0':
                 lcnn_model.load_state_dict(
-                    torch.load(os.path.join(script_dir, config['model_path_spec_mag_v0']), map_location=device),
+                    torch.load(os.path.join(script_dir, config['model_path_spec_logmag']), map_location=device),
                     strict=False)
         elif type_of_spec == 'pow':
             if model_version == 'v0':
@@ -88,7 +88,7 @@ def init_eval(model, model_version, type_of_spec, dataset, feature):
 
 
     if feature == 'audio':
-        if dataset == 'whole' and type_of_spec == 'pow':
+        if dataset == 'whole':
             feat_directory = '/nas/public/dataset/asvspoof2019/LA/ASVspoof2019_LA_eval/flac/'
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
             csv_location = os.path.join(script_dir, 'eval',
@@ -227,11 +227,11 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    model = 'SENet2D'
+    model = 'ResNet2D'
     model_version = 'v0'
-    type_of_spec = 'pow'   # 'mag', 'pow'
+    type_of_spec = 'logmag'   # 'mag', 'pow'
     dataset = 'whole'   # '3s', 'whole'
-    feature = 'spec'  # spec or audio
+    feature = 'audio'  # spec or audio
     '''
     #######################################
     '''

@@ -38,7 +38,7 @@ def Ens1D_ResSENRaw(config_sen,
     type_of_spec = 'pow'  # this was inside the model....
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
-    audio_folder = f'Ens1D_ResSENRaw_{model_version}_{dataset}_{type_of_spec}_{q_raw}_{q_sen}_{epsilon_str_raw}_{epsilon_str_sen}'
+    audio_folder = f'Ens1D_ResSENRaw_{model_version}_{dataset}_{type_of_spec}_{q_res}_{q_sen}_{q_raw}_{epsilon_str_res}_{epsilon_str_sen}_{epsilon_str_raw}'
     audio_folder = os.path.join(current_dir,
                                 f'Ens1D_ResSENRaw_{model_version}_{type_of_spec}', audio_folder)
 
@@ -55,7 +55,7 @@ def Ens1D_ResSENRaw(config_sen,
     data_loader = DataLoader(feat_set,
                              batch_size=config_sen['eval_batch_size'],
                              shuffle=False,
-                             num_workers=15)
+                             num_workers=10)
     del feat_set
     L = nn.NLLLoss()
 
@@ -200,13 +200,16 @@ def Ens1D_ResSENRaw(config_sen,
             pert_mean = np.mean(audio)
             audio = audio + (clean_mean - pert_mean)
 
+            # cut the audio to original audio length
+            sliced_audio = audio[:audio_len[m]]
+
             save_perturbed_audio(file=file_eval[index[m]],
                                  folder=audio_folder,
-                                 audio=audio,
+                                 audio=sliced_audio,
                                  sr=16000,
                                  attack='Ens1D',
                                  epsilon=None,
-                                 model=f'ResSENRaw_{q_raw}_{q_sen}',
+                                 model=f'ResSENRaw_{q_res}_{q_sen}_{q_raw}',
                                  model_version=model_version,
                                  type_of_spec=type_of_spec)
         del batch_x
@@ -237,12 +240,12 @@ if __name__ == '__main__':
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'
     type_of_spec = 'pow'  # 'pow' or 'mag'
-    q_res = 20
+    q_res = 50
     q_sen = 80
-    q_raw = 10
-    eps_res = 0.008
-    eps_sen = 0.002
-    eps_raw = 0.005
+    q_raw = 60
+    eps_res = 0.03
+    eps_sen = 0.008
+    eps_raw = 0.02
     '''
     #######################################
     '''

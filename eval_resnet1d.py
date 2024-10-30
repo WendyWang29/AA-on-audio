@@ -175,17 +175,17 @@ if __name__ == '__main__':
     '''
     ########## INSERT PARAMETERS ##########
     '''
-    attack = 'BIM'  # 'FGSM' or 'Ensemble'
-    attack_model = 'ResNet2D'  #'ResNet' or 'SENet' or 'ResNet1D'
-    epsilon = 3.0
+    attack = 'Ens1D'  # 'FGSM' or 'Ensemble'
+    attack_model = 'ResSEN'  #'ResNet' or 'SENet' or 'ResNet1D'
+    epsilon = None
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
     feature = 'audio'  # RawNet can only work with audio files
-    q1 = 20
+    q1 = 30
     q2 = 50
-    eps1 = 0.008
-    eps2 = 0.01
+    eps1 = 0.009
+    eps2 = 0.002
 
     '''
     #######################################

@@ -19,17 +19,19 @@ import sys
 
 def main(config, type_of_spec):
 
+    print(f'Training on {type_of_spec} spectrograms')
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     script_dir = os.path.dirname(os.path.realpath(__file__))
 
     if type_of_spec == 'pow':
         model_tag = 'model_{}_{}_{}_{}_v0'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
         model_save_path = os.path.join(script_dir, config['model_folder_pow'], model_tag)
-    elif type_of_spec == 'mag':
-        model_tag = 'model_{}_{}_{}_{}_v0_mag'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
-        model_save_path = os.path.join(script_dir, config['model_folder_mag'], model_tag)
+    elif type_of_spec == 'logmag':
+        model_tag = 'model_{}_{}_{}_{}_v0_logmag'.format(config['features'], config['num_epochs'], config['batch_size'], config['lr'])
+        model_save_path = os.path.join(script_dir, config['model_folder_logmag'], model_tag)
     else:
-        print('You need to choose what kind of spectrogram you want to work with between power and mag')
+        print('You need to choose what kind of spectrogram you want to work with between power and logmag')
         sys.exit()
 
     if not os.path.exists(model_save_path):
@@ -94,6 +96,6 @@ if __name__ == '__main__':
     config_path = os.path.join(script_dir, 'config/SENet.yaml')
     config_res = read_yaml(config_path)
 
-    type_of_spec = 'mag'
+    type_of_spec = 'logmag'
 
     main(config_res, type_of_spec)
