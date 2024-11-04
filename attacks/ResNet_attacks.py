@@ -13,16 +13,133 @@ import sys
 from attacks.sp_utils import spectrogram_inversion_batch
 from attacks_utils import save_perturbed_audio, save_perturbed_spec
 
+def NoAttack(config, type_of_spec, df_eval, dataset):
+    # create the folder for the perturbed dataset
+    epsilon = None
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    epsilon_str = str(epsilon).replace('.', 'dot')
+
+    # audio and spec folder
+    audio_folder = f'NoAttack_ResNet2D_{model_version}_{dataset}_{type_of_spec}_{epsilon_str}'
+    audio_folder = os.path.join(current_dir, f'NoAttack_ResNet2D_{model_version}_{type_of_spec}', audio_folder)
+    spec_folder = os.path.join(current_dir, f'NoAttack_ResNet2D_{model_version}_{type_of_spec}', audio_folder, 'spec')
+
+    os.makedirs(audio_folder, exist_ok=True)
+    os.makedirs(spec_folder, exist_ok=True)
+    print(f'Saving the perturbed audio in {audio_folder}\n')
+
+    # data loader
+    file_eval = list(df_eval['path'])
+    labels_eval = dict(zip(df_eval['path'], df_eval['label']))
+
+    feat_set = LoadAttackData_ResNet(list_IDs=file_eval,
+                                     labels=labels_eval,
+                                     win_len=config['win_len'],
+                                     config=config,
+                                     type_of_spec=type_of_spec)
+    data_loader = DataLoader(feat_set,
+                             batch_size=config['eval_batch_size'],
+                             shuffle=False,
+                             num_workers=15)
+    del feat_set
+
+    win_length = 2048
+    n_fft = 2048
+    hop_length = 512
+    eps = 1e-20
+    window = 'hann'
+
+
+    print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
+    print('The process starts...\n')
+    print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
+
+    for batch_x, batch_y, phase, audio_len, index, max_abs, mean in tqdm(data_loader, total=len(data_loader)):
+        start_time = time.time()
+
+        phase = phase.numpy()
+        max_abs = max_abs.numpy()
+        mean = mean.numpy()
+
+        batch_x = batch_x.squeeze(0).numpy() # nothing changes
+
+        """
+        Save spec and audio
+        """
+        for m in range(batch_x.shape[0]):
+            # save the spec as a (1025,93) spec for all specs
+            spec = batch_x[m]
+            save_perturbed_spec(file=file_eval[index[m]],
+                                folder=spec_folder,
+                                spec=spec,
+                                epsilon=epsilon,
+                                attack=attack,
+                                model='NoAttack',
+                                model_version=model_version,
+                                type_of_spec=type_of_spec)
+
+            # spectrogram inversion
+            if type_of_spec == 'mag':
+                mag = spec
+            elif type_of_spec == 'pow':
+                linear = librosa.db_to_power(spec)
+                mag = np.sqrt(linear)
+            else:
+                sys.exit('You shouldnt be here')
+
+            phase_single_audio = phase[m]
+            recon_audio = librosa.istft(mag * np.exp(1j * phase_single_audio),
+                                        n_fft=n_fft,
+                                        window=window,
+                                        win_length=win_length,
+                                        hop_length=hop_length,
+                                        center=True)
+
+            if type_of_spec == 'pow':
+                '''
+                normalization process
+                '''
+                clean_max_abs = max_abs[m]
+                clean_mean = mean[m]
+                # normalize to have the same max abs value
+                pert_max_abs = np.max(np.abs(recon_audio))
+                if pert_max_abs > 0:  # avoid division by 0
+                    recon_audio = recon_audio * (clean_max_abs / pert_max_abs)
+                # same mean
+                pert_mean = np.mean(recon_audio)
+                recon_audio = recon_audio + (clean_mean - pert_mean)
+            else:
+                pass
+
+            # cut the audio to original audio length
+            sliced_audio = recon_audio[:audio_len[m]]
+
+            save_perturbed_audio(file=file_eval[index[m]],
+                                 folder=audio_folder,
+                                 audio=sliced_audio,
+                                 sr=16000,
+                                 attack=attack,
+                                 epsilon=epsilon,
+                                 model='ResNet2D',
+                                 model_version=model_version,
+                                 type_of_spec=type_of_spec)
+
+        del batch_x
+
+        time_taken = time.time() - start_time
+        tqdm.write(
+            f'Time taken: {time_taken:.3f}')
+        gc.collect()
+
 
 def BIM_ResNet(epsilon,
-                  config,
-                  model,
-                  model_version,
-                  dataset,
-                  type_of_spec,
-                  df_eval,
-                  device):
-
+               config,
+               model,
+               model_version,
+               dataset,
+               type_of_spec,
+               df_eval,
+               device):
     # create the folder for the perturbed dataset
     current_dir = os.path.dirname(os.path.abspath(__file__))
     epsilon_str = str(epsilon).replace('.', 'dot')
@@ -65,7 +182,7 @@ def BIM_ResNet(epsilon,
     print('The BIM 2D attack on ResNet starts...\n')
     print('°º¤ø,¸¸,ø¤º°`°º¤ø,¸,ø¤°º¤ø,¸¸,ø¤º°`°º¤ø,¸\n')
 
-    for batch_x, batch_y, phase, audio_len, index,max_abs, mean in tqdm(data_loader, total=len(data_loader)):
+    for batch_x, batch_y, phase, audio_len, index, max_abs, mean in tqdm(data_loader, total=len(data_loader)):
         start_time = time.time()
 
         phase = phase.numpy()
@@ -211,7 +328,7 @@ def FGSM_ResNet(epsilon, config, model, model_version, dataset, type_of_spec, df
     window = 'hann'
 
     # ########## ATTACK ##########
-    for batch_x, batch_y, phase, audio_len, index,max_abs, mean in tqdm(data_loader, total=len(data_loader)):
+    for batch_x, batch_y, phase, audio_len, index, max_abs, mean in tqdm(data_loader, total=len(data_loader)):
 
         start_time = time.time()
         phase = phase.numpy()
@@ -243,10 +360,10 @@ def FGSM_ResNet(epsilon, config, model, model_version, dataset, type_of_spec, df
         # conversion spec --> audio
         perturbed_batch = perturbed_batch.squeeze(0).detach().cpu().numpy()
 
-        for i in range(perturbed_batch.shape[0]):
+        for m in range(perturbed_batch.shape[0]):
             # save the spec as a (1025,93) spec for all specs
-            spec = perturbed_batch[i]
-            save_perturbed_spec(file=file_eval[index[i]],
+            spec = perturbed_batch[m]
+            save_perturbed_spec(file=file_eval[index[m]],
                                 folder=spec_folder,
                                 spec=spec,
                                 epsilon=epsilon,
@@ -259,7 +376,7 @@ def FGSM_ResNet(epsilon, config, model, model_version, dataset, type_of_spec, df
             linear = librosa.db_to_power(spec)
             mag = np.sqrt(linear)
 
-            phase_single_audio = phase[i]
+            phase_single_audio = phase[m]
 
             recon_audio = librosa.istft(mag * np.exp(1j * phase_single_audio),
                                         n_fft=n_fft,
@@ -268,12 +385,26 @@ def FGSM_ResNet(epsilon, config, model, model_version, dataset, type_of_spec, df
                                         hop_length=hop_length,
                                         center=True)
 
-            recon_audio = librosa.util.normalize(recon_audio)
+            if type_of_spec == 'pow':
+                '''
+                                normalization process
+                                '''
+                clean_max_abs = max_abs[m]
+                clean_mean = mean[m]
+                # normalize to have the same max abs value
+                pert_max_abs = np.max(np.abs(recon_audio))
+                if pert_max_abs > 0:  # avoid division by 0
+                    recon_audio = recon_audio * (clean_max_abs / pert_max_abs)
+                # same mean
+                pert_mean = np.mean(recon_audio)
+                recon_audio = recon_audio + (clean_mean - pert_mean)
+            else:
+                pass
 
             # cut the audio to original audio length
-            sliced_audio = recon_audio[:audio_len[i]]
+            sliced_audio = recon_audio[:audio_len[m]]
 
-            save_perturbed_audio(file=file_eval[index[i]],
+            save_perturbed_audio(file=file_eval[index[m]],
                                  folder=audio_folder,
                                  audio=sliced_audio,
                                  sr=16000,
@@ -305,10 +436,10 @@ if __name__ == '__main__':
     ########## INSERT PARAMETERS ##########
     '''
     attack = 'BIM'  # 'FGSM' or 'BIM'
-    epsilon = 1.0
+    epsilon = 3.0
     dataset = 'whole'  # '3s' or 'whole'
     model_version = 'v0'  # or 'old'
-    type_of_spec = 'logmag'  # 'pow' or 'mag'
+    type_of_spec = 'pow'  # 'pow' or 'mag'
     '''
     #######################################
     '''
@@ -339,23 +470,14 @@ if __name__ == '__main__':
     print(f'ResNet model loaded with weights of version {model_version}\n'
           f'{attack} will be performed with epsilon = {epsilon}, on dataset: {dataset}, using {type_of_spec} spectrograms')
 
-    if attack == 'FGSM':
-        FGSM_ResNet(epsilon,
-                    config,
-                    model,
-                    model_version,
-                    dataset,
-                    type_of_spec,
-                    df_eval,
-                    device)
-    elif attack == 'BIM':
-        BIM_ResNet(epsilon,
-                      config,
-                      model,
-                      model_version,
-                      dataset,
-                      type_of_spec,
-                      df_eval,
-                      device)
-    else:
-        sys.exit('TODO')
+
+    #NoAttack(config, type_of_spec, df_eval, dataset)
+
+    BIM_ResNet(epsilon,
+               config,
+               model,
+               model_version,
+               dataset,
+               type_of_spec,
+               df_eval,
+               device)

@@ -20,7 +20,7 @@ model_folder: 'checkpoints/ResNet1D_model_v0'
 
 df_train_path: 'data/df_train.csv'
 df_dev_path: 'data/df_dev.csv'
-df_eval_path: 'data/df_eval_19.csv'
+df_eval_path: 'data/df_eval_19_reduced.csv'
 df_eval_path_3s: 'data/df_eval_19_3s.csv'
 
 early_stopping: 10

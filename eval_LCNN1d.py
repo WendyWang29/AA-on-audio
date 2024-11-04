@@ -33,11 +33,13 @@ def LCNN1D_eval(model,
                 attack,
                 dataset,
                 feature,
-                q1, q2, eps1, eps2):
+                q1, q2, q3, eps1, eps2, eps3,
+                trip):
 
     epsilon_dot_notation = str(epsilon).replace('.', 'dot')
     eps1_str = str(eps1).replace('.', 'dot')
     eps2_str = str(eps2).replace('.', 'dot')
+    eps3_str = str(eps3).replace('.', 'dot')
 
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
 
@@ -50,11 +52,19 @@ def LCNN1D_eval(model,
                                         f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{epsilon_dot_notation}')
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
-        elif attack == 'Ens1D':
+        elif attack == 'Ens1D' and trip==0:
             feat_directory = os.path.join(script_dir, 'attacks', f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
                                           f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{q1}_{q2}_{eps1_str}_{eps2_str}')
             csv_location = os.path.join(script_dir, 'eval',
                                         f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{q1}_{q2}_{eps1_str}_{eps2_str}')
+            # create list of flac files
+            feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
+        elif attack == 'Ens1D' and trip == 1:
+            feat_directory = os.path.join(script_dir, 'attacks',
+                                          f'{attack}_{attack_model}_{model_version}_{type_of_spec}',
+                                          f'{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{q1}_{q2}_{q3}_{eps1_str}_{eps2_str}_{eps3_str}')
+            csv_location = os.path.join(script_dir, 'eval',
+                                        f'list_flac_{attack}_{attack_model}_{model_version}_{dataset}_{type_of_spec}_{q1}_{q2}_{q3}_{eps1_str}_{eps2_str}_{eps3_str}')
             # create list of flac files
             feat_files = [f for f in os.listdir(feat_directory) if f.endswith('.flac')]
         elif attack == 'Ens2D':
@@ -112,7 +122,7 @@ def LCNN1D_eval(model,
 
 
 
-def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack, dataset, feature, q1, q2, eps1, eps2):
+def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack, dataset, feature, q1, q2, q3, eps1, eps2, eps3, trip):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     script_dir = os.path.dirname(os.path.realpath(__file__))  # get directory of current script
@@ -132,22 +142,31 @@ def init_eval(config, type_of_spec, epsilon, attack_model, model_version, attack
     else:
         sys.exit('Wrong type of spectrogram mode: should be pow or mag')
 
-    if attack != 'Ens2D' and attack != 'Ens1D':
+    if attack != 'Ens2D' and attack != 'Ens1D' and trip==0:
         epsilon_str = str(epsilon).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
                                  f'probs_LCNN1D_{model_version}_{attack}_{attack_model}_{dataset}_{epsilon_str}_{type_of_spec}_{feature}.csv')
         LCNN1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset,
-                    feature, q1, q2, eps1, eps2)
+                    feature, q1, q2, q3, eps1, eps2, eps3)
 
-    elif attack == 'Ens1D':
+    elif attack == 'Ens1D' and trip==0:
         eps1_str = str(eps1).replace('.', 'dot')
         eps2_str = str(eps2).replace('.', 'dot')
         save_path = os.path.join(script_dir,
                                  'eval',
                                  f'probs_LCNN1D_{model_version}_{attack}_{attack_model}_{q1}_{q2}_{eps1_str}_{eps2_str}_{type_of_spec}_{feature}.csv')
         LCNN1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature,
-                     q1, q2, eps1, eps2)
+                     q1, q2, q3, eps1, eps2, eps3)
+    elif attack == 'Ens1D' and trip == 1:
+        eps1_str = str(eps1).replace('.', 'dot')
+        eps2_str = str(eps2).replace('.', 'dot')
+        eps3_str = str(eps3).replace('.', 'dot')
+        save_path = os.path.join(script_dir,
+                                 'eval',
+                                 f'probs_LCNN1D_{model_version}_{attack}_{attack_model}_{q1}_{q2}_{q3}_{eps1_str}_{eps2_str}_{eps3_str}_{type_of_spec}_{feature}.csv')
+        LCNN1D_eval(model, save_path, device, config, type_of_spec, epsilon, attack_model, attack, dataset, feature,
+                      q1, q2,q3, eps1, eps2, eps3, trip=trip)
 
     elif attack == 'Ens2D':
         sys.exit('TODO 2D ens')
@@ -168,16 +187,19 @@ if __name__ == '__main__':
     ########## INSERT PARAMETERS ##########
     '''
     attack = 'Ens1D'  # 'FGSM' or 'Ensemble'
-    attack_model = 'ResSEN'  #'ResNet' or 'SENet' or 'ResNet1D'
+    attack_model = 'ResSENRaw'  #'ResNet' or 'SENet' or 'ResNet1D'
     epsilon = None
     dataset = 'whole'  # '3s' or 'whole'-
     model_version = 'v0'  # or 'old'  version of eval and attack_model
     type_of_spec = 'pow'  # 'pow' or 'mag'
     feature = 'audio'  # SeNet1d can only work with 1d inputs
-    q1 = 30  # first model
-    q2 = 50  # second model
-    eps1 = 0.009
-    eps2 = 0.002
+    q1 = 50
+    q2 = 80
+    q3 = 60
+    eps1 = 0.03
+    eps2 = 0.008
+    eps3 = 0.02
+    trip = 1  # 0 if not the triplet ensemble
 
 
 
@@ -189,4 +211,4 @@ if __name__ == '__main__':
               attack=attack,
               dataset=dataset,
               feature=feature,
-              q1=q1, q2=q2, eps1=eps1, eps2=eps2)
+              q1=q1, q2=q2, q3=q3, eps1=eps1, eps2=eps2, eps3=eps3, trip=trip)
