@@ -138,7 +138,8 @@ def ResNet_eval(resnet_model,
             # score_list = []
             feat_batch = feat_batch.to(torch.float32).to(device)
             score = resnet_model(feat_batch)
-            probabilities = torch.exp(score)
+            probabilities = score
+            #probabilities = torch.exp(score)
             probabilities = probabilities.detach().cpu().numpy()
 
             with open(save_path, mode='a+', newline='') as file:

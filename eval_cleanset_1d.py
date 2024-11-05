@@ -157,7 +157,8 @@ def init_eval(model, model_version, type_of_spec, dataset):
                 # score_list = []
                 feat_batch = feat_batch.to(torch.float32).to(device)
                 score = model1d(feat_batch)
-                probabilities = torch.exp(score)
+                probabilities = score
+                #probabilities = torch.exp(score)
                 probabilities = probabilities.detach().cpu().numpy()
 
                 with open(save_path, mode='a+', newline='') as file:

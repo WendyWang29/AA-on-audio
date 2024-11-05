@@ -114,7 +114,8 @@ def ResNet1D_eval(rawnet_model,
             # score_list = []
             feat_batch = feat_batch.to(torch.float32).to(device)
             score = rawnet_model(feat_batch)
-            probabilities = torch.exp(score)
+            probabilities = score
+            #probabilities = torch.exp(score)
             probabilities = probabilities.detach().cpu().numpy()
 
             with open(save_path, mode='a+', newline='') as file:

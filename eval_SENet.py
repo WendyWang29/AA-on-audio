@@ -138,7 +138,8 @@ def SENet_eval(senet_model,
             # score_list = []
             feat_batch = feat_batch.to(torch.float32).to(device)
             score = senet_model(feat_batch.unsqueeze(dim=1))
-            probabilities = torch.exp(score)
+            probabilities = score
+            #probabilities = torch.exp(score)
             probabilities = probabilities.detach().cpu().numpy()
 
             with open(save_path, mode='a+', newline='') as file:
